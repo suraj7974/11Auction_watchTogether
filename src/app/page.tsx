@@ -1,28 +1,79 @@
-import { getCurrentProfile } from "@/lib/supabase/queries";
-import { signOut } from "@/lib/auth/actions";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { MessageSquare, Play, Smile, ListVideo, Timer, Users } from "lucide-react";
 
-// Minimal authenticated home — the full landing/dashboard arrives in Checkpoint 4.
-export default async function Home() {
+import { getCurrentProfile } from "@/lib/supabase/queries";
+import { buttonVariants } from "@/components/ui/button";
+
+const FEATURES = [
+  { icon: Play, title: "Synced playback", desc: "Play, pause, and seek stay in sync for everyone." },
+  { icon: MessageSquare, title: "Live chat", desc: "React and talk in realtime while you watch." },
+  { icon: Smile, title: "Emoji reactions", desc: "Float reactions over the video as it plays." },
+  { icon: ListVideo, title: "Watch queue", desc: "Line up videos and auto-advance to the next." },
+  { icon: Timer, title: "Start countdown", desc: "Press play together with a 3-2-1 countdown." },
+  { icon: Users, title: "Presence", desc: "See who's in the room as people come and go." },
+];
+
+export default async function LandingPage() {
   const profile = await getCurrentProfile();
+  if (profile) redirect("/dashboard");
 
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-6 px-4 text-center">
-      <div className="space-y-2">
-        <p className="text-4xl">🎬</p>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Welcome{profile ? `, ${profile.display_name}` : ""}!
-        </h1>
-        <p className="text-muted-foreground">
-          You&apos;re signed in. The dashboard and watch rooms are coming next.
-        </p>
-      </div>
+    <div className="flex flex-1 flex-col">
+      <header className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
+        <span className="flex items-center gap-2 font-semibold tracking-tight">
+          <span className="text-xl">🎬</span> Watch Together
+        </span>
+        <div className="flex items-center gap-2">
+          <Link href="/login" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+            Sign in
+          </Link>
+          <Link href="/signup" className={buttonVariants({ size: "sm" })}>
+            Get started
+          </Link>
+        </div>
+      </header>
 
-      <form action={signOut}>
-        <Button type="submit" variant="outline">
-          Sign out
-        </Button>
-      </form>
-    </main>
+      <main className="flex flex-1 flex-col">
+        {/* Hero */}
+        <section className="mx-auto flex w-full max-w-3xl flex-col items-center gap-6 px-4 py-20 text-center">
+          <span className="rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">
+            Watch YouTube together, in perfect sync
+          </span>
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+            Movie nights with friends, <span className="text-primary">no matter the distance</span>.
+          </h1>
+          <p className="max-w-xl text-lg text-muted-foreground">
+            Create a room, paste a YouTube link, and invite friends. Everyone watches together —
+            play, pause, and seek stay synced, with live chat and reactions.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Link href="/signup" className={buttonVariants({ size: "lg" })}>
+              Create a watch party
+            </Link>
+            <Link href="/login" className={buttonVariants({ size: "lg", variant: "outline" })}>
+              Try the demo
+            </Link>
+          </div>
+        </section>
+
+        {/* Features */}
+        <section className="mx-auto w-full max-w-5xl px-4 pb-24">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map((f) => (
+              <div key={f.title} className="rounded-xl border bg-card p-5">
+                <f.icon className="mb-3 size-6 text-primary" />
+                <h3 className="font-semibold">{f.title}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      <footer className="border-t py-6 text-center text-sm text-muted-foreground">
+        Built for the 11auction assignment · Watch Together Platform
+      </footer>
+    </div>
   );
 }

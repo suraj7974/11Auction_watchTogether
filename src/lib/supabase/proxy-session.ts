@@ -1,10 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-/** Routes accessible without an authenticated session. */
+/** Route prefixes accessible without an authenticated session. */
 const PUBLIC_PREFIXES = ["/login", "/signup", "/auth"];
 
 function isPublicPath(pathname: string) {
+  // The landing page ("/") is public; everything else (except the prefixes
+  // below) requires authentication.
+  if (pathname === "/") return true;
   return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
@@ -50,10 +53,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Authenticated user on an auth page → send to the app home.
+  // Authenticated user on an auth page → send to the dashboard.
   if (user && (pathname === "/login" || pathname === "/signup")) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/dashboard";
     url.search = "";
     return NextResponse.redirect(url);
   }

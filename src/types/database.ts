@@ -10,14 +10,14 @@ export type RoomStatus = "lobby" | "watching" | "ended";
 export type MessageType = "chat" | "system";
 export type ParticipantRole = "host" | "viewer";
 
-export interface Profile {
+export type Profile = {
   id: string;
   display_name: string;
   avatar_color: string;
   created_at: string;
-}
+};
 
-export interface Room {
+export type Room = {
   id: string;
   code: string;
   name: string;
@@ -31,7 +31,7 @@ export interface Room {
   created_at: string;
 }
 
-export interface QueueItem {
+export type QueueItem = {
   id: string;
   room_id: string;
   youtube_video_id: string;
@@ -41,9 +41,9 @@ export interface QueueItem {
   added_by: string | null;
   played: boolean;
   created_at: string;
-}
+};
 
-export interface Message {
+export type Message = {
   id: string;
   room_id: string;
   user_id: string | null;
@@ -51,15 +51,15 @@ export interface Message {
   content: string;
   type: MessageType;
   created_at: string;
-}
+};
 
-export interface RoomParticipant {
+export type RoomParticipant = {
   id: string;
   room_id: string;
   user_id: string;
   role: ParticipantRole;
   joined_at: string;
-}
+};
 
 // Minimal Database shape for the typed Supabase client. Row/Insert/Update are
 // kept simple (Insert = partial of Row) since our writes are explicit.
@@ -70,26 +70,31 @@ export interface Database {
         Row: Profile;
         Insert: Partial<Profile> & Pick<Profile, "id" | "display_name">;
         Update: Partial<Profile>;
+        Relationships: [];
       };
       rooms: {
         Row: Room;
         Insert: Partial<Room> & Pick<Room, "code" | "name" | "host_id">;
         Update: Partial<Room>;
+        Relationships: [];
       };
       queue_items: {
         Row: QueueItem;
         Insert: Partial<QueueItem> & Pick<QueueItem, "room_id" | "youtube_video_id" | "url">;
         Update: Partial<QueueItem>;
+        Relationships: [];
       };
       messages: {
         Row: Message;
         Insert: Partial<Message> & Pick<Message, "room_id" | "display_name" | "content">;
         Update: Partial<Message>;
+        Relationships: [];
       };
       room_participants: {
         Row: RoomParticipant;
         Insert: Partial<RoomParticipant> & Pick<RoomParticipant, "room_id" | "user_id">;
         Update: Partial<RoomParticipant>;
+        Relationships: [];
       };
     };
     Views: Record<string, never>;
