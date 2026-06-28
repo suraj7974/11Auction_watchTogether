@@ -11,7 +11,7 @@ import {
 } from "react";
 
 import { createClient } from "@/lib/supabase/client";
-import { useRoom } from "@/components/room/room-provider";
+import { useRoom, type PlaybackBroadcast } from "@/components/room/room-provider";
 import type { QueueItem } from "@/types/database";
 
 type PlaybackContextValue = {
@@ -23,7 +23,6 @@ type PlaybackContextValue = {
   playItem: (itemId: string) => void;
   next: () => void;
   hasNext: boolean;
-  // Wiring for the <YouTubePlayer> component:
   registerPlayer: (player: YT.Player) => void;
   handleStateChange: (state: number) => void;
 };
@@ -36,31 +35,36 @@ export function usePlayback() {
   return ctx;
 }
 
+const DRIFT_TOLERANCE = 1.5; // seconds before a viewer re-seeks
+const HEARTBEAT_MS = 2500;
+
 export function PlaybackProvider({ children }: { children: React.ReactNode }) {
-  const { room, queue, isHost } = useRoom();
+  const { room, queue, isHost, broadcastPlayback, requestSync, onPlaybackMessage } = useRoom();
   const supabase = useMemo(() => createClient(), []);
 
   const playerRef = useRef<YT.Player | null>(null);
   const loadedVideoRef = useRef<string | null>(null);
+  const currentItemIdRef = useRef<string | null>(room.current_item_id);
+
   const [playerReady, setPlayerReady] = useState(false);
   const [currentItemId, setCurrentItemId] = useState<string | null>(room.current_item_id);
   const [isPlaying, setIsPlaying] = useState(room.is_playing);
+
+  const setCurrent = useCallback((id: string | null) => {
+    currentItemIdRef.current = id;
+    setCurrentItemId(id);
+  }, []);
 
   const currentItem = useMemo(
     () => queue.find((q) => q.id === currentItemId) ?? null,
     [queue, currentItemId],
   );
-
   const currentIndex = currentItem ? queue.findIndex((q) => q.id === currentItem.id) : -1;
   const hasNext = currentIndex >= 0 && currentIndex < queue.length - 1;
 
-  // Host-only: persist playback state to the room (source of truth for late joiners).
+  // Host-only: persist to the room (source of truth for SSR late joiners).
   const persist = useCallback(
-    async (partial: {
-      is_playing?: boolean;
-      position_seconds?: number;
-      current_item_id?: string | null;
-    }) => {
+    async (partial: { is_playing?: boolean; position_seconds?: number; current_item_id?: string | null }) => {
       if (!isHost) return;
       if (partial.current_item_id?.startsWith("temp-")) delete partial.current_item_id;
       await supabase
@@ -71,44 +75,80 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     [isHost, supabase, room.id],
   );
 
-  // Initial position for a (possibly late) joiner, derived from the room snapshot.
+  // Host-only: broadcast the live playback state to viewers.
+  const emitState = useCallback(() => {
+    const player = playerRef.current;
+    if (!player) return;
+    const state: PlaybackBroadcast = {
+      currentItemId: currentItemIdRef.current,
+      videoId: loadedVideoRef.current,
+      positionSeconds: player.getCurrentTime?.() ?? 0,
+      isPlaying: player.getPlayerState?.() === YT.PlayerState.PLAYING,
+      emittedAt: Date.now(),
+    };
+    broadcastPlayback(state);
+  }, [broadcastPlayback]);
+
+  // Viewer-only: apply a host broadcast to the local player.
+  const applyState = useCallback((s: PlaybackBroadcast) => {
+    const player = playerRef.current;
+    setCurrent(s.currentItemId);
+    setIsPlaying(s.isPlaying);
+    if (!player || !s.videoId) return;
+
+    const target = s.positionSeconds + (s.isPlaying ? (Date.now() - s.emittedAt) / 1000 : 0);
+
+    if (loadedVideoRef.current !== s.videoId) {
+      loadedVideoRef.current = s.videoId;
+      if (s.isPlaying) player.loadVideoById({ videoId: s.videoId, startSeconds: Math.max(0, target) });
+      else player.cueVideoById({ videoId: s.videoId, startSeconds: Math.max(0, target) });
+      return;
+    }
+
+    // Same video — correct drift and match play/pause.
+    const actual = player.getCurrentTime?.() ?? 0;
+    if (Math.abs(actual - target) > DRIFT_TOLERANCE) player.seekTo(Math.max(0, target), true);
+    const ps = player.getPlayerState?.();
+    if (s.isPlaying && ps !== YT.PlayerState.PLAYING) player.playVideo();
+    if (!s.isPlaying && ps === YT.PlayerState.PLAYING) player.pauseVideo();
+  }, [setCurrent]);
+
+  // Initial position for a (possibly late) joiner from the room snapshot.
   const joinPosition = useCallback(() => {
     const base = room.position_seconds;
     if (!room.is_playing) return base;
-    const elapsed = (Date.now() - new Date(room.playback_updated_at).getTime()) / 1000;
-    return Math.max(0, base + elapsed);
+    return Math.max(0, base + (Date.now() - new Date(room.playback_updated_at).getTime()) / 1000);
   }, [room.position_seconds, room.is_playing, room.playback_updated_at]);
 
   const registerPlayer = useCallback(
     (player: YT.Player) => {
       playerRef.current = player;
       setPlayerReady(true);
-
       if (currentItem) {
-        const start = joinPosition();
         loadedVideoRef.current = currentItem.youtube_video_id;
-        if (room.is_playing) {
-          player.loadVideoById({ videoId: currentItem.youtube_video_id, startSeconds: start });
-        } else {
-          player.cueVideoById({ videoId: currentItem.youtube_video_id, startSeconds: start });
-        }
+        const start = joinPosition();
+        if (room.is_playing) player.loadVideoById({ videoId: currentItem.youtube_video_id, startSeconds: start });
+        else player.cueVideoById({ videoId: currentItem.youtube_video_id, startSeconds: start });
       }
+      // Ask the host for an up-to-the-moment state.
+      requestSync();
     },
-    // currentItem/joinPosition/room.is_playing captured for the one-time initial sync
-    [currentItem, joinPosition, room.is_playing],
+    [currentItem, joinPosition, room.is_playing, requestSync],
   );
 
   const playItem = useCallback(
     (itemId: string) => {
       const item = queue.find((q) => q.id === itemId);
       if (!item) return;
-      setCurrentItemId(itemId);
+      setCurrent(itemId);
       setIsPlaying(true);
       loadedVideoRef.current = item.youtube_video_id;
       playerRef.current?.loadVideoById({ videoId: item.youtube_video_id, startSeconds: 0 });
       void persist({ current_item_id: itemId, is_playing: true, position_seconds: 0 });
+      // emitState reads the player; broadcast shortly after the load registers.
+      setTimeout(emitState, 250);
     },
-    [queue, persist],
+    [queue, persist, emitState, setCurrent],
   );
 
   const togglePlay = useCallback(() => {
@@ -130,36 +170,62 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
       setIsPlaying(false);
       playerRef.current?.pauseVideo();
       void persist({ is_playing: false });
+      emitState();
     }
-  }, [currentIndex, queue, playItem, persist]);
+  }, [currentIndex, queue, playItem, persist, emitState]);
 
   const handleStateChange = useCallback(
     (state: number) => {
       const player = playerRef.current;
       if (state === YT.PlayerState.PLAYING) {
         setIsPlaying(true);
-        void persist({ is_playing: true, position_seconds: player?.getCurrentTime() ?? 0 });
+        if (isHost) {
+          void persist({ is_playing: true, position_seconds: player?.getCurrentTime() ?? 0 });
+          emitState();
+        }
       } else if (state === YT.PlayerState.PAUSED) {
         setIsPlaying(false);
-        void persist({ is_playing: false, position_seconds: player?.getCurrentTime() ?? 0 });
+        if (isHost) {
+          void persist({ is_playing: false, position_seconds: player?.getCurrentTime() ?? 0 });
+          emitState();
+        }
+      } else if (state === YT.PlayerState.BUFFERING) {
+        if (isHost) emitState(); // propagates seeks
       } else if (state === YT.PlayerState.ENDED) {
         if (isHost) next();
       }
     },
-    [persist, isHost, next],
+    [isHost, persist, emitState, next],
   );
 
-  // Periodic position checkpoint (host) — keeps late joiners accurate.
+  // Register a single realtime handler (host responds to requests; viewer follows).
+  const emitRef = useRef(emitState);
+  emitRef.current = emitState;
+  const applyRef = useRef(applyState);
+  applyRef.current = applyState;
+
+  useEffect(() => {
+    return onPlaybackMessage((msg) => {
+      if ("request" in msg) {
+        if (isHost) emitRef.current();
+      } else if (!isHost) {
+        applyRef.current(msg);
+      }
+    });
+  }, [onPlaybackMessage, isHost]);
+
+  // Host heartbeat: broadcast + persist position so everyone stays aligned.
   useEffect(() => {
     if (!isHost) return;
     const id = setInterval(() => {
       const player = playerRef.current;
-      if (player && isPlaying) {
+      if (player && player.getPlayerState?.() === YT.PlayerState.PLAYING) {
+        emitState();
         void persist({ position_seconds: player.getCurrentTime(), is_playing: true });
       }
-    }, 5000);
+    }, HEARTBEAT_MS);
     return () => clearInterval(id);
-  }, [isHost, isPlaying, persist]);
+  }, [isHost, emitState, persist]);
 
   const value: PlaybackContextValue = {
     currentItem,
