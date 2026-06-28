@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { ensureMembership } from "@/lib/rooms/membership";
 import { generateRoomCode, normalizeRoomCode } from "@/lib/rooms/codes";
 
 export type RoomActionState = { error?: string };
@@ -35,9 +36,7 @@ export async function createRoom(
       .single();
 
     if (!error && data) {
-      await supabase
-        .from("room_participants")
-        .insert({ room_id: data.id, user_id: user.id, role: "host" });
+      await ensureMembership(data.id, user.id, true);
       createdCode = data.code;
       break;
     }
@@ -64,15 +63,7 @@ async function joinByCode(code: string): Promise<RoomActionState> {
     .maybeSingle();
   if (!room) return { error: `No room found with code "${code}".` };
 
-  const { error } = await supabase.from("room_participants").upsert(
-    {
-      room_id: room.id,
-      user_id: user.id,
-      role: room.host_id === user.id ? "host" : "viewer",
-    },
-    { onConflict: "room_id,user_id", ignoreDuplicates: true },
-  );
-  if (error) return { error: error.message };
+  await ensureMembership(room.id, user.id, room.host_id === user.id);
 
   redirect(`/room/${room.code}`);
 }
