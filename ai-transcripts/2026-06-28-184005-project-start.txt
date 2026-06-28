@@ -1,0 +1,1089 @@
+
+❯
+  The file contains 4 Problem Statements (PS). I have chosen Option 4: Watch
+  Together Platform. Based on that:
+
+  Read and summarize the challenge — Give me a full breakdown of the challenge
+  requirements, rules, and evaluation criteria so I understand everything
+  without having to read the entire file myself.
+  Focus on Option 4 (Watch Together Platform) — Analyze what this PS requires,
+  list all the features and technical requirements, and tell me exactly how we
+  can build it step by step.
+  Build the project — Follow all procedures, rules, and guidelines mentioned in
+  the challenge file while building the Watch Together Platform. Don't skip
+  any requirement.
+  Create proper documentation — Generate two documents:
+
+  A project documentation (technical docs for the Watch Together Platform)
+  A flow/overview doc for me explaining the challenge and how the solution
+  addresses it, in simple terms
+
+
+  Chat transcript guidance — Since this is a vibe coding challenge and I need
+  to submit the Claude conversation transcript as part of the submission,
+  explain how I can share or export my Claude session/chat transcript for
+  submission.
+
+⏺ I'll start by reading the challenge file carefully.
+
+  Read 1 file, listed 1 directory (ctrl+o to expand)
+
+⏺ I've read req.txt in full. Here's the complete breakdown, then a few decisions
+  I need from you before I write the build plan.
+
+  📋 Challenge Summary (11auction Assignment)
+
+  The deal: Pick ONE of 4 project options and build it end-to-end. You must use
+  AI coding tools (that's the point — they judge how well you direct AI, not
+  whether you hand-wrote code).
+
+  Every submission must include:
+  - GitHub repo + hosted live link + clear README.md
+  - .env.example
+  - ai-transcripts/ folder (chat exports + ai-usage-summary.md)
+  - Architecture/tradeoffs notes + known limitations + test/demo instructions
+
+  General technical requirements (mandatory for all options):
+  - Auth or user/session identity · Persistent DB · Clean frontend UI ·
+  Seed/demo data or demo flow · Hosted deployment · Basic error handling ·
+  Loading + empty states · Clear separation of frontend/backend/db/realtime
+  - Recommended (not required) to stay in the TypeScript ecosystem
+  - Code must be modular, readable, typed, and handle basic concurrent use
+
+  Hosting: Working live URL with demo credentials OR a public demo mode.
+
+  Evaluation criteria (7): ① Product completeness ② Realtime correctness (works
+  across multiple browser sessions, consistent under concurrent actions) ③
+  Engineering quality ④ Frontend quality (desktop-only is fine, responsiveness
+  doesn't matter, but loading/empty/error states do) ⑤ Deployment (working + env
+  vars documented) ⑥ AI usage quality (clear prompts, reviewed/improved AI
+  code, can explain what you accepted/rejected) ⑦ Communication (explain
+  architecture in a follow-up round).
+
+  🎯 Option 4 — Watch Together Platform
+
+  A watch-party app: one user creates a room, adds a YouTube/video link, invites
+  friends, everyone watches in sync with live chat.
+
+  Core features (all required):
+
+  ┌─────┬───────────────────────────────────────────────┐
+  │  #  │                    Feature                    │
+  ├─────┼───────────────────────────────────────────────┤
+  │ 1   │ Create watch room                             │
+  ├─────┼───────────────────────────────────────────────┤
+  │ 2   │ Join room by link/code                        │
+  ├─────┼───────────────────────────────────────────────┤
+  │ 3   │ Add YouTube/video URL                         │
+  ├─────┼───────────────────────────────────────────────┤
+  │ 4   │ Shared video player                           │
+  ├─────┼───────────────────────────────────────────────┤
+  │ 5   │ Realtime play/pause/seek sync                 │
+  ├─────┼───────────────────────────────────────────────┤
+  │ 6   │ Realtime chat                                 │
+  ├─────┼───────────────────────────────────────────────┤
+  │ 7   │ Room participants list                        │
+  ├─────┼───────────────────────────────────────────────┤
+  │ 8   │ Late-joiner sync (enter at correct timestamp) │
+  ├─────┼───────────────────────────────────────────────┤
+  │ 9   │ Basic room persistence                        │
+  └─────┴───────────────────────────────────────────────┘
+
+  Realtime requirements (the heart of the grade): play/pause syncs · seeking
+  syncs · chat updates live · late joiners enter at correct timestamp · multiple
+  users must not permanently desync the room.
+
+  Optional features (pick to stand out): host-only controls · emoji reactions ·
+  watch queue · user presence · room history · private/public rooms · voice
+  notes · polls · start-at-same-time countdown · mobile mode.
+
+  Note: README must state assumptions explicitly.
+
+  ---
+  Before I write the detailed build plan, I need to lock in a few high-impact
+  decisions. There's no existing code (the repo is empty except req.txt), so
+  this is greenfield — these choices shape everything.
+
+⏺ User answered Claude's questions:
+  ⎿  · Which stack & realtime approach should we use? Both deploy to a working
+     live URL and stay in TypeScript. → Next.js + Supabase + Vercel
+     · How should user identity / auth work? The challenge requires 'auth OR
+     user/session identity' plus a demo flow. → Full email/password auth + demo
+     account
+     · Which optional features should we build to stand out? (Core 9 features
+     are always included. Pick any.) → Emoji reactions, Watch queue, Start
+     countdown, Host-only controls
+
+⏺ Locked in. Here's what you chose:
+  - Stack: Next.js + Supabase + Vercel
+  - Auth: Full email/password + seeded demo account
+  - Extras: Host-only controls · Emoji reactions · Watch queue · Start countdown
+  (all four)
+
+  With host-only controls selected, the sync model becomes clean and
+  host-authoritative (the host's player is the single source of truth — this is
+  also the most reliable way to prevent permanent desync). Let me write the full
+  plan.
+
+⏺ Updated plan
+  ⎿  /plan to preview
+
+⏺ The plan is written. Quick note on your transcript export question (it's also
+  baked into the plan): when we're done, run /export in this Claude Code session
+  and save it as ai-transcripts/claude-session-1.txt. Alternatively, the raw
+  structured log lives at
+  ~/.claude/projects/-Users-suraj7974-Codebase-11Auction/<session-id>.jsonl —
+  copy that in if you want the full log. I'll also generate the required
+  ai-usage-summary.md automatically.
+
+  Here's the plan for your approval:
+  ⎿  User rejected Claude's plan:
+     ╭─────────────────────────────────────────────────────────────────────────╮
+     │ Plan: Watch Together Platform (11auction — Option 4)                    │
+     │                                                                         │
+     │ Context                                                                 │
+     │                                                                         │
+     │ The req.txt challenge asks us to build one of four products end-to-end, │
+     │ using AI coding                                                         │
+     │ tools, and ship it as a real, hosted, documented product. We chose      │
+     │ Option 4: Watch Together                                                │
+     │ Platform — a watch-party app where a host creates a room, adds a        │
+     │ YouTube link, invites                                                   │
+     │ friends, and everyone watches in sync with live chat.                   │
+     │                                                                         │
+     │ The submission is graded on: product completeness, realtime correctness │
+     │ (the heart of the                                                       │
+     │ grade), engineering quality, frontend quality (desktop-only OK, but     │
+     │ loading/empty/error states                                              │
+     │ matter), deployment, AI usage quality, and communication. The           │
+     │ deliverable is not just code:                                           │
+     │ it's a GitHub repo + live URL + README + .env.example + ai-transcripts/ │
+     │ + architecture notes.                                                   │
+     │                                                                         │
+     │ Decisions locked with the user:                                         │
+     │ - Stack: Next.js (App Router, TypeScript) + Tailwind + shadcn/ui +      │
+     │ Supabase + Vercel                                                       │
+     │ - Realtime: Supabase Realtime (broadcast for playback/reactions,        │
+     │ presence for participants,                                              │
+     │ postgres_changes for persisted chat)                                    │
+     │ - Auth: Supabase email/password + a seeded demo account + public demo   │
+     │ room                                                                    │
+     │ - Extras: host-only controls, emoji reactions, watch queue,             │
+     │ start-at-same-time countdown                                            │
+     │ - Sync model: host-authoritative (host player = source of truth;        │
+     │ prevents permanent desync)                                              │
+     │                                                                         │
+     │ ▎ Greenfield repo — only req.txt exists today. No existing code to      │
+     │ ▎ reuse.                                                                │
+     │                                                                         │
+     │ ---                                                                     │
+     │ Architecture                                                            │
+     │                                                                         │
+     │ Browser (Next.js client)                 Supabase                       │
+     │   Vercel                                                                │
+     │   ├─ Auth UI (email/pw)        ──────▶  Auth (auth.users)               │
+     │ ◀── hosts the Next.js app                                               │
+     │   ├─ Room page                          Postgres (rooms, queue,         │
+     │   │   ├─ YouTube IFrame player            messages, participants,       │
+     │ profiles)                                                               │
+     │   │   ├─ Chat panel           ◀──────▶  Realtime:                       │
+     │   │   ├─ Participants panel                • broadcast  → playback,     │
+     │ reactions, countdown, sync                                              │
+     │   │   ├─ Queue panel                       • presence   → live          │
+     │ participants list                                                       │
+     │   │   └─ Host controls                     • postgres_changes(messages) │
+     │ → live persisted chat                                                   │
+     │   └─ Server Actions / Route Handlers ──▶  (service-role) room create,   │
+     │ queue mutation,                                                         │
+     │                                            host-only playback writes,   │
+     │ RLS-guarded                                                             │
+     │                                                                         │
+     │ Separation of concerns (a graded requirement):                          │
+     │ - lib/supabase/ — browser client, server client, types                  │
+     │ - lib/realtime/ — channel setup, event types, sync engine (drift math)  │
+     │ - app/ — routes + server actions (backend)                              │
+     │ - components/ — UI (frontend)                                           │
+     │ - supabase/migrations/ + supabase/seed.sql — database                   │
+     │                                                                         │
+     │ ---                                                                     │
+     │ Data Model (Postgres / Supabase)                                        │
+     │                                                                         │
+     │ ┌───────────────────┬────────────────────────────────────────────────── │
+     │ ────┐                                                                   │
+     │ │       Table       │                     Key columns                   │
+     │    │                                                                    │
+     │ ├───────────────────┼────────────────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │ profiles          │ id(→auth.users), display_name, avatar_color,      │
+     │    │                                                                    │
+     │ │                   │ created_at                                        │
+     │    │                                                                    │
+     │ ├───────────────────┼────────────────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │                   │ id, code(short unique), name, host_id, is_public, │
+     │    │                                                                    │
+     │ │ rooms             │ status(lobby/watching/ended), current_item_id,    │
+     │    │                                                                    │
+     │ │                   │ is_playing, position_seconds,                     │
+     │ playback_updated_at,   │                                                │
+     │ │                   │ created_at                                        │
+     │    │                                                                    │
+     │ ├───────────────────┼────────────────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │ queue_items       │ id, room_id, youtube_video_id, title, url,        │
+     │ position, │                                                             │
+     │ │                   │  added_by, played(bool), created_at               │
+     │    │                                                                    │
+     │ ├───────────────────┼────────────────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │ messages          │ id, room_id, user_id, display_name, content,      │
+     │    │                                                                    │
+     │ │                   │ type(chat/system), created_at                     │
+     │    │                                                                    │
+     │ ├───────────────────┼────────────────────────────────────────────────── │
+     │ ────┤                                                                   │
+     │ │ room_participants │ id, room_id, user_id, role(host/viewer),          │
+     │ joined_at   │                                                           │
+     │ └───────────────────┴────────────────────────────────────────────────── │
+     │ ────┘                                                                   │
+     │                                                                         │
+     │ - RLS: only authenticated users; room members read/write their room's   │
+     │ messages/queue;                                                         │
+     │ only host_id can write rooms playback fields and advance the queue      │
+     │ (host-only enforcement                                                  │
+     │ at the DB layer, not just UI).                                          │
+     │ - rooms playback fields = the persisted source of truth for late-joiner │
+     │ sync + restart.                                                         │
+     │                                                                         │
+     │ ---                                                                     │
+     │ Realtime Design (the core grade)                                        │
+     │                                                                         │
+     │ Channel: one per room, room:{code}.                                     │
+     │                                                                         │
+     │ 1. Playback sync (host-authoritative):                                  │
+     │   - Host's YouTube player is the truth. On host play / pause / seek     │
+     │ (detected via IFrame                                                    │
+     │ onStateChange + position-jump detection), host (a) writes {is_playing,  │
+     │ position_seconds, playback_updated_at} to rooms and (b) broadcasts      │
+     │ playback event.                                                         │
+     │   - Clients apply the event: seek to position_seconds + (now −          │
+     │ emittedAt if playing), then                                             │
+     │ play/pause. Non-host players are kept in a "follow" mode.               │
+     │ 2. Drift correction: host broadcasts a lightweight sync heartbeat every │
+     │ ~5s with current                                                        │
+     │ position; any client whose drift > ~1.5s re-seeks. This is what         │
+     │ guarantees "multiple users                                              │
+     │ should not permanently desync."                                         │
+     │ 3. Late-joiner sync: on join, read rooms playback fields → compute      │
+     │ current position from                                                   │
+     │ playback_updated_at; also broadcast request_sync → host replies with a  │
+     │ fresh sync.                                                             │
+     │ Baseline from DB, refined by host reply.                                │
+     │ 4. Chat: insert into messages; render live via postgres_changes         │
+     │ subscription                                                            │
+     │ (persisted + realtime). Survives refresh and seeds room history.        │
+     │ 5. Participants: Supabase presence (track {user_id, name, color, role}) │
+     │ → live list                                                             │
+     │ with join/leave. room_participants table persists membership/role.      │
+     │ 6. Reactions: broadcast reaction (emoji) — ephemeral, high-frequency,   │
+     │ not persisted.                                                          │
+     │ 7. Countdown: host broadcasts countdown (3→2→1) → all clients show      │
+     │ overlay, then host                                                      │
+     │ triggers synchronized play.                                             │
+     │                                                                         │
+     │ ---                                                                     │
+     │ Build Steps                                                             │
+     │                                                                         │
+     │ 1. Scaffold — create-next-app (TS, App Router, Tailwind), add           │
+     │ shadcn/ui, lucide-react,                                                │
+     │ react-youtube. Set up folder structure + env config + .env.example.     │
+     │ 2. Supabase setup — create project; write migrations (tables above) +   │
+     │ RLS policies +                                                          │
+     │ seed.sql (demo user, public demo room, queued video, sample messages).  │
+     │ Generate TS types.                                                      │
+     │ 3. Auth — email/password sign-up/login, profiles row on signup, route   │
+     │ protection via                                                          │
+     │ middleware, demo-account login shortcut.                                │
+     │ 4. Landing + dashboard — hero, login/signup, Create room, Join by code, │
+     │ Join demo room button; room-history list. Loading/empty/error states.   │
+     │ 5. Room shell — layout: player center, chat sidebar, participants +     │
+     │ queue panels, host                                                      │
+     │ controls bar. All panels wired with loading/empty/error states.         │
+     │ 6. Player + queue — YouTube IFrame integration; add-URL (parse YouTube  │
+     │ ID) → queue_items;                                                      │
+     │ queue list with reorder/remove (host); auto-advance on video end.       │
+     │ 7. Realtime engine — lib/realtime/: presence, chat subscription,        │
+     │ playback broadcast +                                                    │
+     │ host-authoritative sync + drift heartbeat + late-joiner sync. Test      │
+     │ across 2+ browsers.                                                     │
+     │ 8. Extras — host-only control enforcement (UI + RLS), emoji reactions   │
+     │ overlay, watch-queue                                                    │
+     │ advance, synchronized start countdown.                                  │
+     │ 9. Polish — global error handling, toasts, empty/loading skeletons,     │
+     │ desktop layout polish,                                                  │
+     │ reconnect handling.                                                     │
+     │ 10. Docs — README.md (all required sections), .env.example,             │
+     │ docs/PROJECT_DOCUMENTATION.md (technical), docs/OVERVIEW.md (simple     │
+     │ flow/overview),                                                         │
+     │ ai-transcripts/ (ai-usage-summary.md + exported Claude transcript).     │
+     │ 11. Deploy — push to GitHub, deploy to Vercel, set env vars, run seed,  │
+     │ verify live URL with                                                    │
+     │ 2 browser sessions. Document demo credentials.                          │
+     │                                                                         │
+     │ ▎ Accounts needed at build time: I'll need you to authenticate Supabase │
+     │ ▎ (create project                                                       │
+     │ ▎ / get keys) and Vercel (deploy) — I'll prompt you to run the login    │
+     │ ▎ commands with ! when                                                  │
+     │ ▎ we reach steps 2 and 11. GitHub repo creation likewise needs your     │
+     │ ▎ gh/login.                                                             │
+     │                                                                         │
+     │ ---                                                                     │
+     │ Deliverable Documents                                                   │
+     │                                                                         │
+     │ 1. README.md — Live Demo · Demo Credentials · Tech Stack · Features ·   │
+     │ Architecture ·                                                          │
+     │ Realtime Design · Database Schema · AI Usage · Running Locally · Env    │
+     │ Vars · Known Limitations                                                │
+     │ · Future Improvements · Assumptions.                                    │
+     │ 2. docs/PROJECT_DOCUMENTATION.md — technical deep-dive: module map,     │
+     │ data model, realtime                                                    │
+     │ sync engine, API/server actions, RLS, deployment.                       │
+     │ 3. docs/OVERVIEW.md — plain-language: what the challenge asked, how our │
+     │ solution meets each                                                     │
+     │ core + realtime requirement, and the end-to-end user flow.              │
+     │ 4. ai-transcripts/ — ai-usage-summary.md (tools, what AI did, manual    │
+     │ decisions, known                                                        │
+     │ limits) + this Claude session export.                                   │
+     │                                                                         │
+     │ ---                                                                     │
+     │ How to Export the Claude Transcript (for ai-transcripts/)               │
+     │                                                                         │
+     │ - In-session export: run /export in Claude Code → save the output as    │
+     │ ai-transcripts/claude-session-1.txt.                                    │
+     │ - Raw JSONL: local transcript lives at                                  │
+     │ ~/.claude/projects/<project-slug>/<session-id>.jsonl                    │
+     │ (here: ~/.claude/projects/-Users-suraj7974-Codebase-11Auction/<session- │
+     │ id>.jsonl) — copy it                                                    │
+     │ into ai-transcripts/ if you want the full structured log.               │
+     │ - I'll also write ai-usage-summary.md capturing prompts,                │
+     │ accepted/rejected/changed decisions.                                    │
+     │                                                                         │
+     │ ---                                                                     │
+     │ Verification                                                            │
+     │                                                                         │
+     │ - Realtime: open the live room in 2+ browser windows (one host, one     │
+     │ viewer). Confirm                                                        │
+     │ play/pause/seek sync, chat live, reactions, presence list updates, and  │
+     │ a late joiner entering                                                  │
+     │ mid-video lands at the right timestamp. Force a drift and confirm       │
+     │ auto-correction.                                                        │
+     │ - Persistence: refresh → room, queue, chat history restore; playback    │
+     │ resumes at correct spot.                                                │
+     │ - Auth/demo: demo credentials log in; demo room joinable from landing.  │
+     │ - States: verify loading skeletons, empty states (no messages / empty   │
+     │ queue), and error                                                       │
+     │ toasts (bad URL, room not found).                                       │
+     │ - Deploy: live Vercel URL works; env vars documented in .env.example.   │
+     │                                                                         │
+     │ ---                                                                     │
+     │ Assumptions (to state in README)                                        │
+     │                                                                         │
+     │ - YouTube is the primary video source (IFrame API gives precise sync);  │
+     │ direct MP4 is a possible                                                │
+     │ extension.                                                              │
+     │ - Desktop-first (per challenge: responsiveness not graded).             │
+     │ - Host-authoritative sync; if the host leaves, host role transfers to   │
+     │ the next participant (or                                                │
+     │ room pauses) — exact behavior finalized during build.                   │
+     │ - Free-tier Supabase/Vercel; basic concurrent use, not production-scale │
+     │ load.                                                                   │
+     ╰─────────────────────────────────────────────────────────────────────────╯
+
+⏺ Understood — got it. Here's how I'll run it:
+
+  - You own all commits. I never commit. At each checkpoint I stop, hand you an
+  exact commit message, and wait.
+  - Checkpoints are incremental. Checkpoint 1 = project structure/scaffold only
+  → you commit → then we start actual coding in subsequent checkpoints.
+  - I'll work in auto mode within each checkpoint, but always pause at the
+  checkpoint boundary for your commit before continuing.
+
+  To start writing files I need to leave plan mode. Re-confirming with that
+  checkpoint workflow baked in:
+
+⏺ User approved Claude's plan
+  ⎿  Plan saved to: ~/.claude/plans/i-have-a-challenge-mutable-emerson.md ·
+     /plan to edit
+     Plan: Watch Together Platform (11auction — Option 4)
+
+     Context
+
+     The req.txt challenge asks us to build one of four products end-to-end,
+     using AI coding
+     tools, and ship it as a real, hosted, documented product. We chose Option
+     4: Watch Together
+     Platform — a watch-party app where a host creates a room, adds a YouTube
+     link, invites
+     friends, and everyone watches in sync with live chat.
+
+     The submission is graded on: product completeness, realtime correctness
+     (the heart of the
+     grade), engineering quality, frontend quality (desktop-only OK, but
+     loading/empty/error states
+     matter), deployment, AI usage quality, and communication. The deliverable
+     is not just code:
+     it's a GitHub repo + live URL + README + .env.example + ai-transcripts/ +
+     architecture notes.
+
+     Decisions locked with the user:
+     - Stack: Next.js (App Router, TypeScript) + Tailwind + shadcn/ui + Supabase
+     + Vercel
+     - Realtime: Supabase Realtime (broadcast for playback/reactions, presence
+     for participants,
+     postgres_changes for persisted chat)
+     - Auth: Supabase email/password + a seeded demo account + public demo room
+     - Extras: host-only controls, emoji reactions, watch queue,
+     start-at-same-time countdown
+     - Sync model: host-authoritative (host player = source of truth; prevents
+     permanent desync)
+
+     ▎ Greenfield repo — only req.txt exists today. No existing code to reuse.
+
+     ---
+     Architecture
+
+     Browser (Next.js client)                 Supabase
+     Vercel
+       ├─ Auth UI (email/pw)        ──────▶  Auth (auth.users)            ◀──
+     hosts the Next.js app
+       ├─ Room page                          Postgres (rooms, queue,
+       │   ├─ YouTube IFrame player            messages, participants, profiles)
+       │   ├─ Chat panel           ◀──────▶  Realtime:
+       │   ├─ Participants panel                • broadcast  → playback,
+     reactions, countdown, sync
+       │   ├─ Queue panel                       • presence   → live participants
+     list
+       │   └─ Host controls                     • postgres_changes(messages) →
+     live persisted chat
+       └─ Server Actions / Route Handlers ──▶  (service-role) room create, queue
+     mutation,
+                                                host-only playback writes,
+     RLS-guarded
+
+     Separation of concerns (a graded requirement):
+     - lib/supabase/ — browser client, server client, types
+     - lib/realtime/ — channel setup, event types, sync engine (drift math)
+     - app/ — routes + server actions (backend)
+     - components/ — UI (frontend)
+     - supabase/migrations/ + supabase/seed.sql — database
+
+     ---
+     Data Model (Postgres / Supabase)
+
+     ┌───────────────────┬──────────────────────────────────────────────────────
+     ┐
+     │       Table       │                     Key columns
+     │
+     ├───────────────────┼──────────────────────────────────────────────────────
+     ┤
+     │ profiles          │ id(→auth.users), display_name, avatar_color,
+     │
+     │                   │ created_at
+     │
+     ├───────────────────┼──────────────────────────────────────────────────────
+     ┤
+     │                   │ id, code(short unique), name, host_id, is_public,
+     │
+     │ rooms             │ status(lobby/watching/ended), current_item_id,
+     │
+     │                   │ is_playing, position_seconds, playback_updated_at,
+     │
+     │                   │ created_at
+     │
+     ├───────────────────┼──────────────────────────────────────────────────────
+     ┤
+     │ queue_items       │ id, room_id, youtube_video_id, title, url, position,
+     │
+     │                   │  added_by, played(bool), created_at
+     │
+     ├───────────────────┼──────────────────────────────────────────────────────
+     ┤
+     │ messages          │ id, room_id, user_id, display_name, content,
+     │
+     │                   │ type(chat/system), created_at
+     │
+     ├───────────────────┼──────────────────────────────────────────────────────
+     ┤
+     │ room_participants │ id, room_id, user_id, role(host/viewer), joined_at
+     │
+     └───────────────────┴──────────────────────────────────────────────────────
+     ┘
+
+     - RLS: only authenticated users; room members read/write their room's
+     messages/queue;
+     only host_id can write rooms playback fields and advance the queue
+     (host-only enforcement
+     at the DB layer, not just UI).
+     - rooms playback fields = the persisted source of truth for late-joiner
+     sync + restart.
+
+     ---
+     Realtime Design (the core grade)
+
+     Channel: one per room, room:{code}.
+
+     1. Playback sync (host-authoritative):
+       - Host's YouTube player is the truth. On host play / pause / seek
+     (detected via IFrame
+     onStateChange + position-jump detection), host (a) writes {is_playing,
+     position_seconds, playback_updated_at} to rooms and (b) broadcasts playback
+     event.
+       - Clients apply the event: seek to position_seconds + (now − emittedAt if
+     playing), then
+     play/pause. Non-host players are kept in a "follow" mode.
+     2. Drift correction: host broadcasts a lightweight sync heartbeat every ~5s
+     with current
+     position; any client whose drift > ~1.5s re-seeks. This is what guarantees
+     "multiple users
+     should not permanently desync."
+     3. Late-joiner sync: on join, read rooms playback fields → compute current
+     position from
+     playback_updated_at; also broadcast request_sync → host replies with a
+     fresh sync.
+     Baseline from DB, refined by host reply.
+     4. Chat: insert into messages; render live via postgres_changes
+     subscription
+     (persisted + realtime). Survives refresh and seeds room history.
+     5. Participants: Supabase presence (track {user_id, name, color, role}) →
+     live list
+     with join/leave. room_participants table persists membership/role.
+     6. Reactions: broadcast reaction (emoji) — ephemeral, high-frequency, not
+     persisted.
+     7. Countdown: host broadcasts countdown (3→2→1) → all clients show overlay,
+     then host
+     triggers synchronized play.
+
+     ---
+     Build Steps
+
+     1. Scaffold — create-next-app (TS, App Router, Tailwind), add shadcn/ui,
+     lucide-react,
+     react-youtube. Set up folder structure + env config + .env.example.
+     2. Supabase setup — create project; write migrations (tables above) + RLS
+     policies +
+     seed.sql (demo user, public demo room, queued video, sample messages).
+     Generate TS types.
+     3. Auth — email/password sign-up/login, profiles row on signup, route
+     protection via
+     middleware, demo-account login shortcut.
+     4. Landing + dashboard — hero, login/signup, Create room, Join by code,
+     Join demo room button; room-history list. Loading/empty/error states.
+     5. Room shell — layout: player center, chat sidebar, participants + queue
+     panels, host
+     controls bar. All panels wired with loading/empty/error states.
+     6. Player + queue — YouTube IFrame integration; add-URL (parse YouTube ID)
+     → queue_items;
+     queue list with reorder/remove (host); auto-advance on video end.
+     7. Realtime engine — lib/realtime/: presence, chat subscription, playback
+     broadcast +
+     host-authoritative sync + drift heartbeat + late-joiner sync. Test across
+     2+ browsers.
+     8. Extras — host-only control enforcement (UI + RLS), emoji reactions
+     overlay, watch-queue
+     advance, synchronized start countdown.
+     9. Polish — global error handling, toasts, empty/loading skeletons, desktop
+     layout polish,
+     reconnect handling.
+     10. Docs — README.md (all required sections), .env.example,
+     docs/PROJECT_DOCUMENTATION.md (technical), docs/OVERVIEW.md (simple
+     flow/overview),
+     ai-transcripts/ (ai-usage-summary.md + exported Claude transcript).
+     11. Deploy — push to GitHub, deploy to Vercel, set env vars, run seed,
+     verify live URL with
+     2 browser sessions. Document demo credentials.
+
+     ▎ Accounts needed at build time: I'll need you to authenticate Supabase
+     ▎ (create project
+     ▎ / get keys) and Vercel (deploy) — I'll prompt you to run the login
+     ▎ commands with ! when
+     ▎ we reach steps 2 and 11. GitHub repo creation likewise needs your
+     ▎ gh/login.
+
+     ---
+     Deliverable Documents
+
+     1. README.md — Live Demo · Demo Credentials · Tech Stack · Features ·
+     Architecture ·
+     Realtime Design · Database Schema · AI Usage · Running Locally · Env Vars ·
+     Known Limitations
+     · Future Improvements · Assumptions.
+     2. docs/PROJECT_DOCUMENTATION.md — technical deep-dive: module map, data
+     model, realtime
+     sync engine, API/server actions, RLS, deployment.
+     3. docs/OVERVIEW.md — plain-language: what the challenge asked, how our
+     solution meets each
+     core + realtime requirement, and the end-to-end user flow.
+     4. ai-transcripts/ — ai-usage-summary.md (tools, what AI did, manual
+     decisions, known
+     limits) + this Claude session export.
+
+     ---
+     How to Export the Claude Transcript (for ai-transcripts/)
+
+     - In-session export: run /export in Claude Code → save the output as
+     ai-transcripts/claude-session-1.txt.
+     - Raw JSONL: local transcript lives at
+     ~/.claude/projects/<project-slug>/<session-id>.jsonl
+     (here:
+     ~/.claude/projects/-Users-suraj7974-Codebase-11Auction/<session-id>.jsonl)
+     — copy it
+     into ai-transcripts/ if you want the full structured log.
+     - I'll also write ai-usage-summary.md capturing prompts,
+     accepted/rejected/changed decisions.
+
+     ---
+     Verification
+
+     - Realtime: open the live room in 2+ browser windows (one host, one
+     viewer). Confirm
+     play/pause/seek sync, chat live, reactions, presence list updates, and a
+     late joiner entering
+     mid-video lands at the right timestamp. Force a drift and confirm
+     auto-correction.
+     - Persistence: refresh → room, queue, chat history restore; playback
+     resumes at correct spot.
+     - Auth/demo: demo credentials log in; demo room joinable from landing.
+     - States: verify loading skeletons, empty states (no messages / empty
+     queue), and error
+     toasts (bad URL, room not found).
+     - Deploy: live Vercel URL works; env vars documented in .env.example.
+
+     ---
+     Assumptions (to state in README)
+
+     - YouTube is the primary video source (IFrame API gives precise sync);
+     direct MP4 is a possible
+     extension.
+     - Desktop-first (per challenge: responsiveness not graded).
+     - Host-authoritative sync; if the host leaves, host role transfers to the
+     next participant (or
+     room pauses) — exact behavior finalized during build.
+     - Free-tier Supabase/Vercel; basic concurrent use, not production-scale
+     load.
+
+⏺ Plan approved. Starting Checkpoint 1: project structure/scaffold only (no
+  feature coding yet).
+
+  Let me set up checkpoint tracking and verify the environment first.
+
+⏺ I'll create the checkpoint task list and check the environment in parallel.
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ also at last tell me to export each session so that i dont forgot to do that
+
+⏺ Got it — I'll remind you to export the Claude session at every checkpoint
+  (when I hand you the commit message), so you never lose a transcript for the
+  ai-transcripts/ folder.
+
+  Let me check the environment and create the checkpoint task list.
+
+⏺ Bash(node --version; npm --version; echo "---"; which pnpm yarn 2>/dev/null;
+      echo "---git---"; git --version; echo "---gh---"; gh --version 2>/dev/null
+      | head -1; ec…)
+  ⎿  v22.23.1
+     10.9.8
+     ---
+     … +8 lines (ctrl+o to expand)
+
+⏺ Environment looks great (Node 22, pnpm, git, gh all present). Creating the
+  checkpoint task list:
+⏺ Marking Checkpoint 1 in progress and scaffolding. I'll temporarily move
+  req.txt aside so create-next-app can scaffold into the current directory, then
+  restore it.
+
+⏺ Bash(mv req.txt /private/tmp/claude-501/-Users-suraj7974-Codebase-11Auction/7c
+      1d9038-e27f-4daf-b13b-33308451f4a2/scratchpad/req.txt && ls -la && echo
+      "moved ok")
+  ⎿  moved ok
+
+⏺ Now scaffolding the Next.js app (TypeScript, App Router, Tailwind, src dir).
+  This includes dependency install so it may take a minute or two.
+
+⏺ Bash(npx create-next-app@latest . --ts --tailwind --eslint --app --src-dir
+      --import-alias "@/*" --use-pnpm --turbopack --yes 2>&1 | tail -40)
+  ⎿  Could not create a project called "11Auction" because of npm naming re
+     strictions:
+         * name can no longer contain capital letters
+
+⏺ The directory name 11Auction violates npm naming rules (capital letter). I'll
+  scaffold into a temp subfolder with a valid name, then move everything up.
+
+⏺ Bash(npx create-next-app@latest watch-together --ts --tailwind --eslint --app
+      --src-dir --import-alias "@/*" --use-pnpm --turbopack --skip-install --yes
+      2>&1 | tail…)
+  ⎿  Creating a new Next.js app in /Users/suraj7974/Codebase/11Auction/watc
+     h-together.
+     … +8 lines (ctrl+o to expand)
+
+⏺ Scaffolded. Now moving everything up to the project root and removing the temp
+  folder.
+
+⏺ Bash(shopt -s dotglob && mv watch-together/* . && rmdir watch-together &&
+      shopt -u dotglob && echo "--- moved ---" && ls -la)
+  ⎿  Error: Exit code 127
+     (eval):1: command not found: shopt
+⏺ Shell is zsh — let me run it via bash for the dotglob move.
+
+⏺ Bash(bash -c 'shopt -s dotglob && mv watch-together/* . && rmdir
+      watch-together && echo "--- moved ---"' && ls -la)
+  ⎿  --- moved ---
+
+  Listed 1 directory (ctrl+o to expand)
+
+⏺ Structure moved up, git repo now at root. Restoring req.txt and checking what
+  was scaffolded:
+
+⏺ Bash(mv /private/tmp/claude-501/-Users-suraj7974-Codebase-11Auction/7c1d9038-e
+      27f-4daf-b13b-33308451f4a2/scratchpad/req.txt . && echo "req.txt
+      restored"; echo "--- p…)
+  ⎿  req.txt restored
+     --- package.json ---
+     {
+     … +34 lines (ctrl+o to expand)
+
+⏺ Scaffold uses Next.js 16.2.9 + React 19 + Tailwind v4 — a newer Next than my
+  training data, and AGENTS.md explicitly warns to read
+  node_modules/next/dist/docs/ before writing app code. I'll respect that in the
+  coding checkpoints. For now, installing base deps + Supabase libraries:
+
+⏺ Bash(pnpm install 2>&1 | tail -15)
+  ⎿  + next 16.2.9
+     + react 19.2.4 (19.2.7 is available)
+     + react-dom 19.2.4 (19.2.7 is available)
+     … +12 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ API Error: Unable to connect to API (ConnectionRefused)
+
+✻ Baked for 7m 11s
+
+❯ continue for the first checkpoint the wifi was down so it got stopped
+
+⏺ No problem — base deps are installed. Continuing Checkpoint 1. Adding the
+  Supabase libraries:
+
+⏺ Bash(pnpm add @supabase/supabase-js @supabase/ssr 2>&1 | tail -12)
+  ⎿  Progress: resolved 0, reused 1, downloaded 0, added 0
+     Progress: resolved 182, reused 152, downloaded 0, added 0
+     Packages: +10
+     … +9 lines (ctrl+o to expand)
+
+⏺ Setting up shadcn/ui (UI component foundation):
+
+⏺ Bash(pnpm dlx shadcn@latest init --base-color neutral --yes 2>&1 | tail -25)
+  ⎿  Progress: resolved 1, reused 0, downloaded 0, added 0
+     Progress: resolved 32, reused 26, downloaded 5, added 0
+     Progress: resolved 173, reused 156, downloaded 12, added 0
+     … +6 lines (ctrl+o to expand)
+  ⎿  (timeout 3m)
+
+⏺ Bash(pnpm dlx shadcn@latest init --help 2>&1 | tail -30)
+  ⎿  Arguments:
+       components                 names, url or local path to component
+     … +26 lines (ctrl+o to expand)
+
+⏺ The flag is -d for defaults. Running it:
+
+⏺ Bash(pnpm dlx shadcn@latest init -d -y 2>&1 | tail -25)
+  ⎿  - Verifying framework.
+     ✔ Verifying framework. Found Next.js.
+     - Validating Tailwind CSS. Found v4.
+     … +21 lines (ctrl+o to expand)
+  ⎿  (timeout 3m)
+
+⏺ shadcn initialized. Adding the component set the app will need (cards, inputs,
+  dialogs, toasts, etc.) so coding checkpoints have the UI primitives ready:
+
+⏺ Bash(pnpm dlx shadcn@latest add button input label card avatar dialog
+      dropdown-menu scroll-area sonner badge separator tooltip tabs skeleton -y
+      2>&1 | tail -20)
+  ⎿    - src/components/ui/dialog.tsx
+     ℹ Skipped 1 file: (files might be identical, use --overwrite to overwr
+     ite)
+     … +18 lines (ctrl+o to expand)
+  ⎿  (timeout 3m)
+
+⏺ shadcn components added. Now creating the project folder structure,
+  .env.example, and README skeleton (structure only — no feature logic yet):
+
+⏺ Bash(mkdir -p src/lib/supabase src/lib/realtime src/lib/validation src/types
+      src/app/\(auth\) src/app/room/\[code\] src/components/room
+      supabase/migrations docs ai-t…)
+  ⎿  dirs created
+     ai-transcripts
+     docs
+     … +7 lines (ctrl+o to expand)
+
+⏺ Now writing the foundational structure files. Starting with .env.example:
+⏺ Write(.env.example)
+  ⎿  Wrote 19 lines to .env.example
+         ----------------------------------------------------------------
+       2 # Watch Together Platform — Environment Variables
+         r Supabase project. `.env.local` and fill in the values from you
+       4 # (Supabase dashboard → Project Settings → API)
+       5 # --------------------------------------------------------------
+       6 --------------
+       7 # Public Supabase project URL (safe to expose to the browser)
+       9 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+      10 # Public anon key (safe to expose to the browser; row-level secu
+         rity protects data)
+     … +16 lines (ctrl+o to expand)
+
+⏺ Adding .gitkeep files so empty structural directories are tracked by git:
+
+⏺ Bash(touch src/lib/supabase/.gitkeep src/lib/realtime/.gitkeep
+      src/lib/validation/.gitkeep src/types/.gitkeep
+      src/components/room/.gitkeep supabase/migrations/.gitke…)
+  ⎿  gitkeeps created
+     ai-transcripts/.gitkeep
+     src/components/room/.gitkeep
+     … +5 lines (ctrl+o to expand)
+
+⏺ Now replacing the default README with a proper skeleton containing all the
+  sections the challenge requires:
+
+⏺ Write(README.md)
+  ⎿  Error writing file
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Write(README.md)
+  ⎿  Added 69 lines, removed 21 lines
+       1 -This is a [Next.js](https://nextjs.org) project bootstrapped wi
+         -th [`create-next-app`](https://nextjs.org/docs/app/api-referenc
+         -e/cli/create-next-app).
+       1 +# Watch Together Platform
+       2
+       3 -## Getting Started
+       3 +A watch-party platform where one user creates a room, adds a Yo
+         +uTube link, invites friends, and
+       4 +everyone watches **in sync** — with realtime play/pause/seek, l
+         +ive chat, presence, reactions, a
+       5 +shared watch queue, and a synchronized start countdown.
+       6
+       5 -First, run the development server:
+       7 +> Built for the **11auction** assignment — Option 4: Watch Toge
+         +ther Platform.
+       8
+       9 +---
+      10 +
+      11 +## Live Demo
+      12 +
+      13 +_TBD — hosted Vercel URL will go here._
+      14 +
+      15 +## Demo Credentials
+      16 +
+      17 +_TBD — seeded demo account email/password + public demo room li
+         +nk._
+      18 +
+      19 +## Tech Stack
+      20 +
+      21 +- **Framework:** Next.js 16 (App Router) + React 19 + TypeScrip
+         +t
+      22 +- **Styling:** Tailwind CSS v4 + shadcn/ui
+      23 +- **Backend / DB / Auth:** Supabase (Postgres, Auth, Realtime)
+      24 +- **Realtime:** Supabase Realtime — broadcast (playback/reactio
+         +ns/countdown), presence
+      25 +  (participants), postgres_changes (persisted chat)
+      26 +- **Video:** YouTube IFrame Player API
+      27 +- **Hosting:** Vercel
+      28 +
+      29 +## Features
+      30 +
+      31 +**Core**
+      32 +- Create watch room · Join by link/code · Add YouTube URL · Sha
+         +red player
+      33 +- Realtime play/pause/seek sync · Realtime chat · Participants
+         +list
+      34 +- Late-joiner sync · Room persistence
+      35 +
+      36 +**Extras**
+      37 +- Host-only controls · Emoji reactions · Watch queue · Start-at
+         +-same-time countdown
+      38 +
+      39 +## Architecture
+      40 +
+      41 +_TBD — see `docs/PROJECT_DOCUMENTATION.md`._
+      42 +
+      43 +## Realtime Design
+      44 +
+      45 +_TBD — host-authoritative sync model, drift correction, late-jo
+         +iner sync._
+      46 +
+      47 +## Database Schema
+      48 +
+      49 +_TBD — `profiles`, `rooms`, `queue_items`, `messages`, `room_pa
+         +rticipants`._
+      50 +
+      51 +## AI Usage
+      52 +
+      53 +This project was built with **Claude Code**. See `ai-transcript
+         +s/` for session exports and
+      54 +`ai-transcripts/ai-usage-summary.md` for a summary of what AI h
+         +elped with and the manual
+      55 +decisions made.
+      56 +
+      57 +## Running Locally
+      58 +
+      59  ```bash
+       8 -npm run dev
+       9 -# or
+      10 -yarn dev
+      11 -# or
+      60 +pnpm install
+      61 +cp .env.example .env.local   # fill in Supabase keys
+      62  pnpm dev
+      13 -# or
+      14 -bun dev
+      63  ```
+      64
+      17 -Open [http://localhost:3000](http://localhost:3000) with your b
+         -rowser to see the result.
+      65 +App runs at http://localhost:3000.
+      66
+      19 -You can start editing the page by modifying `app/page.tsx`. The
+         - page auto-updates as you edit the file.
+      67 +## Environment Variables
+      68
+      21 -This project uses [`next/font`](https://nextjs.org/docs/app/bui
+         -lding-your-application/optimizing/fonts) to automatically optim
+         -ize and load [Geist](https://vercel.com/font), a new font famil
+         -y for Vercel.
+      69 +See `.env.example`. Required: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT
+         +_PUBLIC_SUPABASE_ANON_KEY`,
+      70 +`SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SITE_URL`.
+      71
+      23 -## Learn More
+      72 +## Known Limitations
+      73
+      25 -To learn more about Next.js, take a look at the following resou
+         -rces:
+      74 +_TBD._
+      75
+      27 -- [Next.js Documentation](https://nextjs.org/docs) - learn abou
+         -t Next.js features and API.
+      28 -- [Learn Next.js](https://nextjs.org/learn) - an interactive Ne
+         -xt.js tutorial.
+      76 +## Future Improvements
+      77
+      30 -You can check out [the Next.js GitHub repository](https://githu
+         -b.com/vercel/next.js) - your feedback and contributions are wel
+         -come!
+      78 +_TBD._
+      79
+      32 -## Deploy on Vercel
+      80 +## Assumptions
+      81
+      34 -The easiest way to deploy your Next.js app is to use the [Verce
+         -l Platform](https://vercel.com/new?utm_medium=default-template&
+         -filter=next.js&utm_source=create-next-app&utm_campaign=create-n
+         -ext-app-readme) from the creators of Next.js.
+      35 -
+      36 -Check out our [Next.js deployment documentation](https://nextjs
+         -.org/docs/app/building-your-application/deploying) for more det
+         -ails.
+      82 +- YouTube is the primary video source (IFrame API enables preci
+         +se sync).
+      83 +- Desktop-first (per the assignment, responsiveness is not grad
+         +ed).
+      84 +- Host-authoritative playback sync.
+
+⏺ Let me verify .gitignore doesn't accidentally ignore .env.example (a common
+  create-next-app gotcha) and that the structure is sound:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ .env* would ignore .env.example too — adding an exception so it gets
+  committed:
+
+⏺ Update(.gitignore)
+  ⎿  Added 1 line
+      32
+      33  # env files (can opt-in for committing if needed)
+      34  .env*
+      35 +!.env.example
+      36
+      37  # vercel
+      38  .vercel
+
+⏺ Verifying the scaffold compiles cleanly before we commit:
+
+⏺ Bash(pnpm build 2>&1 | tail -30)
+  ⎿  > watch-together@0.1.0 build /Users/suraj7974/Codebase/11Auction
+     > next build
+     … +20 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ Build passes cleanly (Next.js 16 + Turbopack). Checkpoint 1 structure is
+  complete. Let me check the git state so I can give you an accurate commit
+  instruction:
+
+⏺ Bash(echo "=== git log ===" && git log --oneline 2>&1 | head -5; echo "=== git
+      status ===" && git status --short 2>&1 | head -40; echo "=== top-level
+      tree ===" && gi…)
+  ⎿  === git log ===
+     e9c15c7 Initial commit from Create Next App
+     === git status ===
+     … +44 lines (ctrl+o to expand)
+
+⏺ ✅ Checkpoint 1 complete — project structure scaffolded. Stopping here for
+  your commit.
+
+  What was built (structure only, no feature code yet)
+
+  - Next.js 16.2.9 + React 19 + TypeScript, App Router, src/ dir, import alias
+  @/*
+  - Tailwind v4 + shadcn/ui initialized, with base components added (button,
+  input, label, card, avatar, dialog, dropdown-menu, scroll-area, sonner, badge,
+  separator, tooltip, tabs, skeleton)
+  - Supabase libraries installed (@supabase/supabase-js, @supabase/ssr)
+  - Folder skeleton: src/lib/{supabase,realtime,validation}, src/types,
+  src/components/room, src/app/(auth), src/app/room/[code], supabase/migrations,
+  docs/, ai-transcripts/ (each kept with .gitkeep)
+  - .env.example with all required env vars + .gitignore fixed so .env.example
+  is tracked
+  - README skeleton with every section the challenge requires
+  - ✅ pnpm build passes cleanly
+
+  ▎ ⚠️ Note for later: this scaffolded Next.js 16 (newer than my training data).
+  ▎ Its AGENTS.md warns me to read node_modules/next/dist/docs/ before writing
+  ▎ app code — I'll do that in the coding checkpoints so we don't hit
+  ▎ breaking-change surprises.
+
+  ▎ Heads-up: create-next-app already auto-made an Initial commit from Create
+  ▎ Next App. The command below adds our structure on top as the next commit.
+  ▎ (If you'd rather squash, let me know.)
+
+  👉 Your commit (run these yourself)
+
+  git add -A
+  git commit -m "chore: scaffold Next.js 16 + Supabase + shadcn project
+  structure
+
+  - Next.js 16 (App Router, TS, src dir) + Tailwind v4 + shadcn/ui
+  - Add Supabase client libs and base UI components
+  - Lay out lib/supabase, lib/realtime, types, room dirs
+  - Add .env.example, README skeleton, ai-transcripts/ and docs/ folders"
+
+  📤 Don't forget: export this session
+
+  Run /export now and save it into ai-transcripts/ (e.g.
+  ai-transcripts/claude-session-1.txt) so you have the transcript for
+  submission. I'll remind you again at each checkpoint.
+
+  ---
+  Once you've committed, tell me to continue and I'll start Checkpoint 2:
+  Supabase schema, RLS & seed — which will need you to create a Supabase project
+  and share the keys (I'll walk you through it).
+
+✻ Churned for 3m 7s
