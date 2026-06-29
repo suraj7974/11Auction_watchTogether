@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
-import { CircleAlert, CircleCheck } from "lucide-react";
+import { useActionState, useState } from "react";
+import { CircleAlert, CircleCheck, Eye, EyeOff } from "lucide-react";
 
 import { signIn, signUp, type AuthState } from "@/lib/auth/actions";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,13 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
   const action = mode === "login" ? signIn : signUp;
   const [state, formAction, isPending] = useActionState(action, initialState);
 
+  // Controlled inputs so values survive a failed submit (React 19 resets
+  // uncontrolled fields after a form action).
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <form action={formAction} className="flex flex-col gap-4">
       {mode === "signup" && (
@@ -27,6 +34,8 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
             name="display_name"
             placeholder="e.g. Alex"
             autoComplete="nickname"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
             required
           />
         </div>
@@ -40,20 +49,35 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
           type="email"
           placeholder="you@example.com"
           autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           required
         />
       </div>
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          name="password"
-          type="password"
-          placeholder="••••••••"
-          autoComplete={mode === "login" ? "current-password" : "new-password"}
-          required
-        />
+        <div className="relative">
+          <Input
+            id="password"
+            name="password"
+            type={showPassword ? "text" : "password"}
+            placeholder="••••••••"
+            autoComplete={mode === "login" ? "current-password" : "new-password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="pr-10"
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((s) => !s)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          </button>
+        </div>
       </div>
 
       {next && <input type="hidden" name="next" value={next} />}
