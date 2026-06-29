@@ -3,6 +3,7 @@
 import { RoomProvider } from "@/components/room/room-provider";
 import { PlaybackProvider } from "@/components/room/playback-provider";
 import { PollProvider } from "@/components/room/poll-provider";
+import { KnockManager } from "@/components/room/knock-manager";
 import { RoomHeader } from "@/components/room/room-header";
 import { RoomSidebar } from "@/components/room/room-sidebar";
 import { VideoStage } from "@/components/room/video-stage";
@@ -22,6 +23,7 @@ export function RoomView({
     <RoomProvider bundle={bundle} currentUser={currentUser}>
       <PlaybackProvider>
         <PollProvider>
+          <KnockManager />
           <div className="flex h-[100dvh] flex-col bg-background/65">
             <RoomHeader siteUrl={siteUrl} />
 

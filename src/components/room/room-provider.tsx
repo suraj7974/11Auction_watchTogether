@@ -78,6 +78,7 @@ const GENERIC_BROADCAST_EVENTS = [
   "poll_close",
   "poll_req",
   "poll_state",
+  "knock",
 ];
 
 export function RoomProvider({

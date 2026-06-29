@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
-import { claimRoomHost, ensureMembership } from "@/lib/rooms/membership";
+import { claimRoomHost, ensureMembership, isRoomMember } from "@/lib/rooms/membership";
 import { generateRoomCode, normalizeRoomCode } from "@/lib/rooms/codes";
 
 export type RoomActionState = { error?: string };
@@ -58,12 +58,17 @@ async function joinByCode(code: string): Promise<RoomActionState> {
 
   const { data: room } = await supabase
     .from("rooms")
-    .select("id, code, host_id")
+    .select("id, code, host_id, is_public")
     .eq("code", code)
     .maybeSingle();
   if (!room) return { error: `No room found with code "${code}".` };
 
-  await ensureMembership(room.id, user.id, room.host_id === user.id);
+  const isHost = room.host_id === user.id;
+  // Public rooms auto-join; private rooms need host admission (the room page
+  // shows the waiting screen) unless you're already the host or a member.
+  if (room.is_public || isHost || (await isRoomMember(room.id, user.id))) {
+    await ensureMembership(room.id, user.id, isHost);
+  }
 
   redirect(`/room/${room.code}`);
 }
@@ -76,6 +81,29 @@ export async function joinRoom(
   const code = normalizeRoomCode(String(formData.get("code") ?? ""));
   if (!code) return { error: "Enter a room code." };
   return joinByCode(code);
+}
+
+/** Admit a knocking user into a (private) room. Only the host may call this. */
+export async function admitToRoom(
+  code: string,
+  targetUserId: string,
+): Promise<RoomActionState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in." };
+
+  const { data: room } = await supabase
+    .from("rooms")
+    .select("id, host_id")
+    .eq("code", code)
+    .maybeSingle();
+  if (!room) return { error: "Room not found." };
+  if (room.host_id !== user.id) return { error: "Only the host can admit people." };
+
+  await ensureMembership(room.id, targetUserId, false);
+  return {};
 }
 
 /** Transfer host control of a room to another participant. Only the current

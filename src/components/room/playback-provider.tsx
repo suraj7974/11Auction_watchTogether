@@ -41,6 +41,54 @@ export function usePlayback() {
   return ctx;
 }
 
+// --- captions sync helpers --------------------------------------------------
+type CaptionPlayer = YT.Player & {
+  getOptions?: () => string[];
+  getOption?: (module: string, option: string) => unknown;
+  setOption?: (module: string, option: string, value: unknown) => void;
+  loadModule?: (module: string) => void;
+  unloadModule?: (module: string) => void;
+};
+type CaptionTrack = { languageCode?: string } | null;
+
+function captionModule(player: CaptionPlayer): string {
+  try {
+    const opts = player.getOptions?.();
+    if (Array.isArray(opts)) {
+      if (opts.includes("captions")) return "captions";
+      if (opts.includes("cc")) return "cc";
+    }
+  } catch {
+    /* not ready */
+  }
+  return "captions";
+}
+
+function readCaptions(player: YT.Player): CaptionTrack {
+  const p = player as CaptionPlayer;
+  try {
+    const track = p.getOption?.(captionModule(p), "track") as CaptionTrack;
+    return track && track.languageCode ? track : null;
+  } catch {
+    return null;
+  }
+}
+
+function applyCaptions(player: YT.Player, track: CaptionTrack) {
+  const p = player as CaptionPlayer;
+  const mod = captionModule(p);
+  try {
+    if (track && track.languageCode) {
+      p.loadModule?.(mod);
+      p.setOption?.(mod, "track", track);
+    } else {
+      p.unloadModule?.(mod);
+    }
+  } catch {
+    /* captions unavailable for this video */
+  }
+}
+
 const DRIFT_TOLERANCE = 1.5; // seconds before a viewer re-seeks
 const HEARTBEAT_MS = 2500;
 
@@ -88,15 +136,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   const emitState = useCallback(() => {
     const player = playerRef.current;
     if (!player) return;
-    let captionTrack: unknown = null;
-    try {
-      captionTrack = (player as unknown as { getOption?: (m: string, o: string) => unknown }).getOption?.(
-        "captions",
-        "track",
-      );
-    } catch {
-      // captions module may not be ready
-    }
+    const captionTrack = readCaptions(player);
     const state: PlaybackBroadcast = {
       currentItemId: currentItemIdRef.current,
       videoId: loadedVideoRef.current,
@@ -132,21 +172,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     if (!s.isPlaying && ps === YT.PlayerState.PLAYING) player.pauseVideo();
 
     // Sync captions (CC on/off + language) to match the host.
-    try {
-      const cc = player as unknown as {
-        loadModule?: (m: string) => void;
-        setOption?: (m: string, o: string, v: unknown) => void;
-      };
-      const track = s.captionTrack as { languageCode?: string } | null | undefined;
-      if (track && track.languageCode) {
-        cc.loadModule?.("captions");
-        cc.setOption?.("captions", "track", track);
-      } else {
-        cc.setOption?.("captions", "track", {});
-      }
-    } catch {
-      // captions module not available for this video
-    }
+    applyCaptions(player, (s.captionTrack ?? null) as CaptionTrack);
   }, [setCurrent]);
 
   // Initial position for a (possibly late) joiner from the room snapshot.
@@ -281,7 +307,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
   // Captions (or other modules) changed — host re-broadcasts so viewers match.
   const handleApiChange = useCallback(() => {
-    if (isHost) emitState();
+    if (!isHost) return;
+    emitState();
+    // The caption track can settle a beat after the event fires.
+    setTimeout(emitState, 300);
   }, [isHost, emitState]);
 
   // Register a single realtime handler (host responds to requests; viewer follows).

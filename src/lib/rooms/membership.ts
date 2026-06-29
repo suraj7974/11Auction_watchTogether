@@ -7,6 +7,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * service role so it doesn't depend on the per-request user token reaching
  * Postgres. The caller MUST pass an already-authenticated user id.
  */
+/** Whether a user is already a participant of a room (service role, RLS-proof). */
+export async function isRoomMember(roomId: string, userId: string): Promise<boolean> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("room_participants")
+    .select("user_id")
+    .eq("room_id", roomId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  return Boolean(data);
+}
+
 export async function ensureMembership(roomId: string, userId: string, isHost: boolean) {
   const admin = createAdminClient();
   await admin.from("room_participants").upsert(

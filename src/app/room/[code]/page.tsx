@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 
 import { getCurrentProfile, getRoomBundle, getRoomByCode } from "@/lib/supabase/queries";
-import { ensureMembership } from "@/lib/rooms/membership";
+import { ensureMembership, isRoomMember } from "@/lib/rooms/membership";
 import { normalizeRoomCode } from "@/lib/rooms/codes";
 import { RoomView } from "@/components/room/room-view";
+import { WaitingRoom } from "@/components/room/waiting-room";
 
 export default async function RoomPage({ params }: { params: Promise<{ code: string }> }) {
   const { code: raw } = await params;
@@ -15,9 +16,26 @@ export default async function RoomPage({ params }: { params: Promise<{ code: str
   const room = await getRoomByCode(code);
   if (!room) notFound();
 
-  // Joining by link makes you a participant (idempotent), so you appear in the
-  // people list and can read chat/queue under RLS.
-  await ensureMembership(room.id, profile.id, room.host_id === profile.id);
+  const isHost = room.host_id === profile.id;
+  const member = isHost || (await isRoomMember(room.id, profile.id));
+
+  // Private rooms aren't joinable from the link alone — the host must admit you.
+  if (!room.is_public && !member) {
+    return (
+      <WaitingRoom
+        roomId={room.id}
+        roomName={room.name}
+        currentUser={{
+          userId: profile.id,
+          displayName: profile.display_name,
+          avatarColor: profile.avatar_color,
+        }}
+      />
+    );
+  }
+
+  // Public rooms auto-join; for private members/host this is idempotent.
+  await ensureMembership(room.id, profile.id, isHost);
 
   const bundle = await getRoomBundle(code);
   if (!bundle) notFound();

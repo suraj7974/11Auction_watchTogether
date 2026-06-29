@@ -29,7 +29,7 @@ export function CreateRoomForm() {
           className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
         >
           <option value="true">Public — anyone with the link can join</option>
-          <option value="false">Private — invite by code only</option>
+          <option value="false">Private — the host must admit each person</option>
         </select>
       </div>
 
