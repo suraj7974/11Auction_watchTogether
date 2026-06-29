@@ -68,6 +68,9 @@ export function WelcomeIntro() {
   const [line, setLine] = useState(0);
 
   useEffect(() => {
+    // Strip the ?welcome flag so a refresh doesn't replay the intro.
+    window.history.replaceState(null, "", window.location.pathname);
+
     const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (reduced) {
       const skip = setTimeout(() => setPhase("done"), 0);

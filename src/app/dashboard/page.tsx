@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, Clapperboard, Sparkles } from "lucide-react";
@@ -5,6 +6,7 @@ import { ArrowRight, Clapperboard, Sparkles } from "lucide-react";
 import { getCurrentProfile, getMyRooms } from "@/lib/supabase/queries";
 import { joinDemoRoom } from "@/lib/rooms/actions";
 import { AppHeader } from "@/components/app-header";
+import { WelcomeIntro } from "@/components/welcome-intro";
 import { CreateRoomForm } from "@/components/dashboard/create-room-form";
 import { JoinRoomForm } from "@/components/dashboard/join-room-form";
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +18,28 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ welcome?: string }>;
+}) {
+  const { welcome } = await searchParams;
+
+  // The intro is rendered up front (server-decided), so it's painted with the
+  // first frame and covers the data-fetch skeleton below — never the reverse.
+  return (
+    <>
+      {welcome === "1" && <WelcomeIntro />}
+      <Suspense fallback={<DashboardSkeleton />}>
+        <DashboardBody />
+      </Suspense>
+    </>
+  );
+}
+
+async function DashboardBody() {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
 
@@ -115,6 +137,31 @@ export default async function DashboardPage() {
           )}
         </section>
       </main>
+    </>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <>
+      <div className="flex h-14 items-center justify-between border-b px-4">
+        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-8 w-28" />
+      </div>
+      <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+        <Skeleton className="mb-2 h-7 w-56" />
+        <Skeleton className="mb-8 h-5 w-80" />
+        <div className="grid gap-6 md:grid-cols-2">
+          <Skeleton className="h-64 rounded-xl" />
+          <Skeleton className="h-64 rounded-xl" />
+        </div>
+        <Skeleton className="mt-10 h-6 w-32" />
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Skeleton className="h-32 rounded-xl" />
+          <Skeleton className="h-32 rounded-xl" />
+          <Skeleton className="h-32 rounded-xl" />
+        </div>
+      </div>
     </>
   );
 }
