@@ -15,9 +15,19 @@ ai-transcripts/
   2026-06-28-195519-auth-dashboard-landing.txt
   2026-06-28-212436-queue-realtime-sync.txt
   2026-06-29-141654-emoji-docs.txt
+  2026-06-30-feature-iteration.txt          # post-core extras (see below)
 ```
 
 (Some sessions are combined; filenames reflect the main work in each.)
+
+After the core 11 checkpoints, a second wave of work added the **extras**: live polls, a fullscreen
+theater mode with a YouTube-style side chat, **host transfer** (plus a deniable hand-off prompt when
+the host leaves), a **mobile-friendly** stacked/tabbed layout, **synced captions**, **private rooms
+with knock-to-join** admission, and **voice notes** (record → Supabase Storage → play in chat).
+Alongside these, the UI got a glassmorphism pass with an animated dither background (scoped to the
+landing/auth pages), an on-theme polish (text selection, button cursors), a no-flash welcome intro,
+and an audit of loading/empty/error states (YouTube player errors now toast + auto-skip; DB read
+failures surface as errors rather than empty states).
 
 ## How the work was directed
 
@@ -27,7 +37,9 @@ auto-applied in one shot.
 
 Key decisions were made by the human up front (via explicit choices): the **stack**
 (Next.js + Supabase + Vercel), **full email/password auth + demo account**, and **which extra
-features** to build (host-only controls, reactions, queue, countdown).
+features** to build — first host-only controls, reactions, queue, and countdown, then a second wave
+(polls, fullscreen, host transfer, mobile mode, captions, private rooms, voice notes) each requested
+and reviewed one at a time.
 
 ## What AI helped with
 
@@ -38,6 +50,9 @@ features** to build (host-only controls, reactions, queue, countdown).
   realtime engine (presence + broadcast, drift correction, late-joiner sync).
 - **Debugging**: diagnosing a "row violates RLS" join failure with targeted reproduction scripts,
   and fixing a `supabase-js` custom-schema typing issue.
+- The **extras** (second wave): live polls, fullscreen + side chat, host transfer & hand-off,
+  mobile layout, synced captions, private-room knock/admit (service-role), and voice notes
+  (MediaRecorder → Storage upload → in-chat player), plus the UI/glassmorphism redesign.
 - All documentation.
 
 ## Important manual decisions
@@ -61,7 +76,15 @@ features** to build (host-only controls, reactions, queue, countdown).
 - AI's auth-error messaging was made friendlier (mapped Supabase errors; info vs. error styling).
 - Reaction picker was moved out of the video frame into the chat panel on review.
 - Verified AI's RLS/policies and realtime behavior with reproduction scripts before trusting them.
+- The animated dither background was iterated on the human's feedback (lighter, then scoped to only
+  the landing/auth pages — not the dashboard/room).
+- Private-room enforcement was tightened after the human spotted that anyone with the link could
+  still join (the code is in the URL); admission is now host-gated via a service-role write.
+- Fullscreen controls were repositioned after the human noticed the YouTube logo colliding with the
+  side-chat toggle.
 
 ## Known limitations (also in the README)
 
-- YouTube-only; desktop-first; no host hand-off; sync uses client clocks (small skew possible).
+- YouTube-only; host hand-off is manual (not auto-promoted); sync uses client clocks (small skew
+  possible); voice notes use the browser's native audio format, so a Chrome-recorded WebM/Opus clip
+  may not play back in Safari.

@@ -19,18 +19,23 @@ src/
 │   └── layout.tsx                # Toaster + TooltipProvider + metadata
 ├── components/
 │   ├── room/                     # RoomProvider, PlaybackProvider, panels, player, overlays
+│   │   ├── poll-provider.tsx, active-poll.tsx, create-poll-button.tsx   # live polls
+│   │   ├── voice-message.tsx, use-voice-recorder.ts                     # voice notes
+│   │   ├── waiting-room.tsx, knock-manager.tsx                          # private-room knock/admit
+│   │   └── video-stage.tsx                                              # fullscreen + side chat
 │   ├── dashboard/                # create-room / join-room forms
 │   ├── app-header.tsx, user-avatar.tsx
 │   └── ui/                       # shadcn components
 ├── lib/
 │   ├── supabase/                 # client (browser), server (SSR), admin (service role), queries
-│   ├── rooms/                    # actions (create/join), codes, membership
+│   ├── rooms/                    # actions (create/join/admit/transfer-host), codes, membership
 │   ├── youtube.ts                # URL/ID parsing + thumbnail helpers
 │   └── youtube-iframe.ts         # loads the IFrame Player API once
 ├── types/                        # database.ts (schema types) + room.ts (view models)
 supabase/
 ├── migrations/0001_init.sql      # schema, RLS, helpers, trigger, realtime publication
 ├── migrations/0002_reset_rls.sql # authoritative RLS reset (fixes drift)
+├── migrations/0003_voice_notes.sql # voice message type + public voice-notes Storage bucket
 └── seed.ts                       # demo accounts + DEMO01 room (service role)
 ```
 
@@ -58,6 +63,16 @@ One Supabase Realtime channel per room: `room:{roomId}`, configured with `presen
 | Late-joiner sync | viewer **broadcast** `req` on join → host replies with `pb`; plus DB snapshot |
 | Reactions | **broadcast** `reaction` `{emoji}` (also dispatched locally so the sender sees it) |
 | Countdown | host **broadcast** `countdown` `{endsAt}`; everyone renders, host plays at zero |
+| Voice notes | upload clip to the `voice-notes` Storage bucket → DB insert (persist) + **broadcast** `chat` with `type: "voice"` and `content = "<url>\|<seconds>"` |
+| Polls | host **broadcast** `poll_open` / `poll_vote` / `poll_close`; tally is ephemeral (not persisted) |
+| Host transfer | **broadcast** `host_change` `{hostId}` → every client updates its reactive `hostId`; the admit/transfer write uses the service role |
+| Private rooms | waiting client **broadcast** `knock` every 5s → host replies `admit` (client reloads) or `deny` |
+| Captions | host's `onApiChange` reads the active caption track into `pb`; viewers `loadModule`/`unloadModule` to match |
+
+Several of these are **generic broadcast events** registered through a `GENERIC_BROADCAST_EVENTS`
+array → `broadcastHandlers` map, consumed by panels via `onBroadcast(event, handler)`. Privileged
+state changes (admit a knocker, transfer host) go through **server actions** using the service-role
+client, but only ever for the verified current user / a real room member.
 
 **Host-authoritative playback** (`PlaybackProvider`):
 - The host's `onStateChange` (PLAYING/PAUSED/BUFFERING) persists to `rooms` and broadcasts `pb`.
@@ -70,6 +85,29 @@ One Supabase Realtime channel per room: `room:{roomId}`, configured with `presen
 Cross-provider wiring: the channel lives in `RoomProvider`, which exposes `broadcastPlayback`,
 `requestSync`, `onPlaybackMessage`, and a generic `broadcast` / `onBroadcast`. `PlaybackProvider`
 registers a single handler (stable, latest-callback via refs) to avoid tearing down the player.
+
+### 3.1 Additional room features
+
+- **Host transfer & hand-off.** `hostId` is reactive provider state (not just a server prop). Any
+  host can promote another participant (`transferRoomHost` server action → `host_change` broadcast),
+  and a host who leaves is prompted to hand off (deniable). Because the channel effect must not
+  rebuild on host change, presence re-tracking lives in a separate effect keyed on `isHost`, and
+  `syncPresence` reads `hostId` from a ref.
+- **Private rooms (knock-to-join).** `room/[code]/page.tsx` gates entry: a non-member of a private
+  room is shown `<WaitingRoom/>` (which knocks) instead of the room. The host's `<KnockManager/>`
+  surfaces a deduped, non-expiring **Admit / Deny** toast; admit calls `admitToRoom` (service role)
+  then broadcasts `admit`. This closes the "anyone with the link can join" hole, since the room code
+  is in the URL.
+- **Live polls.** `PollProvider` holds one active poll in memory; the host opens a poll, votes
+  stream in over broadcast, and results render live in `<ActivePoll/>`. Ephemeral by design.
+- **Voice notes.** `useVoiceRecorder` wraps `MediaRecorder` (mic permission, 60s cap, auto-send).
+  `sendVoiceNote` uploads the clip to the public `voice-notes` bucket, persists a `type: "voice"`
+  message, and broadcasts it; `<VoiceMessage/>` is a compact play/pause + progress player.
+- **Fullscreen & mobile.** `<VideoStage/>` owns the Fullscreen API and a YouTube-style **side chat**
+  (landscape only; portrait fullscreen is video-only). On phones the room reflows to a stacked
+  layout with tabbed chat/queue/people.
+- **Synced captions.** The host's caption track is read on `onApiChange` and carried in the playback
+  payload; viewers load/unload the captions module to match, so toggling CC affects everyone.
 
 ## 4. Auth
 
@@ -91,6 +129,9 @@ avoid policy recursion. Highlights:
 
 The realtime publication includes the app tables (`replica identity full`) for completeness,
 though the app uses broadcast rather than `postgres_changes`.
+
+`0003_voice_notes.sql` extends the `messages.type` check to allow `'voice'` and creates a public
+`voice-notes` Storage bucket with policies (authenticated upload, public read) for the audio clips.
 
 ## 6. Key engineering decisions
 

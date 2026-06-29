@@ -18,10 +18,12 @@ chat. Realtime correctness is the heart of the grade.
 3. **In the room.**
    - The **host** pastes a YouTube link into the **Queue**, then presses **Play**.
    - Everyone's video starts together and stays together — pause, resume, and seek all sync.
-   - People **chat** on the side, drop **emoji reactions** that float over the video, and see who
-     else is **in the room**.
-   - The host can run a **3 · 2 · 1 countdown** so everyone starts a video at the same moment.
-4. **Invite.** Share the room link; anyone who opens it joins and **jumps to the current moment**.
+   - People **chat** on the side, drop **emoji reactions** that float over the video, send **voice
+     notes**, vote in **live polls**, and see who else is **in the room**.
+   - The host can run a **3 · 2 · 1 countdown**, **hand the host role** to someone else, and go
+     **fullscreen** with a side chat.
+4. **Invite.** Share the room link; anyone who opens it joins and **jumps to the current moment** —
+   unless it's a **private room**, where the host **admits each person** first.
 
 ## How each requirement is met
 
@@ -38,6 +40,13 @@ chat. Realtime correctness is the heart of the grade.
 | **No permanent desync** | Host is the source of truth; a heartbeat re-aligns anyone who drifts; viewers' controls are locked |
 | Room persistence | Rooms, queue, chat, and playback position are stored in the database |
 
+## Beyond the brief (extras)
+
+On top of the required features, the app adds: **host transfer** (with a deniable prompt when the
+host leaves), **private rooms** where the host admits each person (knock-to-join), **live polls**,
+**voice notes** in chat, **synced captions**, a **fullscreen theater mode** with an optional side
+chat, and a **mobile-friendly** stacked/tabbed layout. See the README's *Features* section.
+
 ## Why these choices
 
 - **One source of truth (the host).** The simplest reliable way to keep everyone together is to let
@@ -52,8 +61,9 @@ chat. Realtime correctness is the heart of the grade.
 
 ## What's intentionally out of scope
 
-- Non-YouTube videos, host hand-off if the host leaves, and mobile-optimized layout (the brief says
-  desktop-only is fine). These are listed as future improvements in the README.
+- Non-YouTube videos (YouTube only, for precise sync) and co-host/moderation roles. Voice notes use
+  the browser's native audio format, so a clip recorded in Chrome may not play back in Safari. These
+  are listed as future improvements in the README.
 
 ## Where to look next
 

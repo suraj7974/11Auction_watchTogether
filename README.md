@@ -47,8 +47,15 @@ in as the host in one click.
 
 **Extras**
 - 🔒 **Host-only controls** (viewers can't desync the room)
-- ❤️ **Emoji reactions** floating over the video
-- 📺 **Watch queue** with auto-advance
+- 🤝 **Host transfer** — hand the room to anyone; leaving prompts a (deniable) hand-off
+- 🚪 **Private rooms with knock-to-join** — the host admits each person individually
+- ❤️ **Emoji reactions** floating over the video (full picker)
+- 📊 **Live polls** — the host asks, everyone votes, results update in realtime
+- 🎙️ **Voice notes** — record and send audio clips in chat
+- 💬 **Synced captions** — the host's caption track toggles for everyone
+- 🖥️ **Fullscreen theater mode** with an optional YouTube-style side chat
+- 📱 **Mobile-friendly viewing** — stacked video + tabbed chat/queue/people
+- 📺 **Watch queue** with auto-advance (and host auto-skip on a dead video)
 - ⏱️ **Synchronized start countdown** (3 · 2 · 1 · Go!)
 - 🟢 **Presence** + live **connection status** indicator
 - 🔁 **Reconnect handling** (re-syncs on reconnect)
@@ -91,8 +98,13 @@ prevents permanent desync.
   **re-seeks**. Viewers' players are also locked (host-only controls), so they can't drift.
 - **Late-joiner sync:** the room row persists the latest playback state; a joiner computes
   `position + elapsed`, and also requests a fresh state from the host on join.
-- **Chat / queue / reactions / countdown:** broadcast events (chat & queue are also persisted to
-  Postgres; optimistic on the sender).
+- **Chat / queue / reactions / countdown / polls / voice notes:** broadcast events (chat, queue &
+  voice notes are also persisted to Postgres; optimistic on the sender). Voice clips upload to
+  Supabase Storage and the audio URL rides the same chat broadcast.
+- **Host transfer:** a `host_change` broadcast re-points every client's reactive `hostId`, so
+  control moves without a reload.
+- **Private rooms:** a non-member opening the link lands in a waiting room that broadcasts a
+  `knock`; the host gets an **Admit / Deny** toast and admission is written with the service role.
 - **Presence:** drives the live participant list and join/leave.
 
 ## Database Schema
@@ -103,13 +115,16 @@ Schema **`eleven_auction`** (isolated from the project's `public` schema). Table
 - `rooms` — `code`, `name`, `host_id`, `is_public`, `status`, and the playback source-of-truth
   columns `current_item_id`, `is_playing`, `position_seconds`, `playback_updated_at`
 - `queue_items` — `room_id`, `youtube_video_id`, `url`, `title`, `position`, `added_by`, `played`
-- `messages` — `room_id`, `user_id`, `display_name`, `content`, `type` (chat/system)
+- `messages` — `room_id`, `user_id`, `display_name`, `content`, `type` (chat/system/voice; a
+  voice row's `content` is `"<audioUrl>|<durationSeconds>"`)
 - `room_participants` — `room_id`, `user_id`, `role` (host/viewer), unique per (room, user)
 
-Row Level Security is enabled on all tables (helpers `is_room_member` / `is_room_host`); a trigger
-`handle_new_user` auto-creates a profile on signup. Full DDL in
-[`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql) and
-[`0002_reset_rls.sql`](supabase/migrations/0002_reset_rls.sql).
+Voice clips live in a public **`voice-notes` Storage bucket**. Row Level Security is enabled on all
+tables (helpers `is_room_member` / `is_room_host`); a trigger `handle_new_user` auto-creates a
+profile on signup. Full DDL in
+[`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql),
+[`0002_reset_rls.sql`](supabase/migrations/0002_reset_rls.sql), and
+[`0003_voice_notes.sql`](supabase/migrations/0003_voice_notes.sql) (voice type + bucket).
 
 ## AI Usage
 
@@ -128,7 +143,9 @@ cp .env.example .env.local     # fill in your Supabase keys (see below)
 
 **Supabase setup (one time):**
 1. **Apply the schema:** in the Supabase dashboard → **SQL Editor**, run
-   `supabase/migrations/0001_init.sql`, then `supabase/migrations/0002_reset_rls.sql`.
+   `supabase/migrations/0001_init.sql`, `supabase/migrations/0002_reset_rls.sql`, then
+   `supabase/migrations/0003_voice_notes.sql` (adds the voice message type + the `voice-notes`
+   Storage bucket).
 2. **Expose the schema:** **Settings → API → Exposed schemas** → add `eleven_auction`.
 3. **Email auth:** **Authentication → Sign In / Providers → Email** → enable the provider and turn
    **off** "Confirm email" (so signups work instantly for the demo).
@@ -155,25 +172,27 @@ See [`.env.example`](.env.example). All are required:
 ## Known Limitations
 
 - **YouTube only** (no raw MP4 / other providers yet); videos must be embeddable.
-- **Desktop-first** — the room layout targets desktop (per the assignment, responsiveness isn't
-  graded). The chat/queue sidebar is hidden on narrow screens.
-- **No host hand-off** — if the host leaves, playback freezes at the last state; viewers can still
-  chat/react. A new host isn't auto-promoted.
+- **Voice notes are recorded in the browser's native format** — Chrome/Firefox produce WebM/Opus,
+  which **Safari can't play back** (and vice-versa). Same-browser rooms are unaffected.
+- **Host hand-off is manual** — leaving prompts a transfer, but it isn't auto-promoted; if the host
+  just closes the tab without transferring, playback freezes at the last state (viewers can still
+  chat/react).
 - **Clock skew** — drift math uses client clocks; large skew could shift sync by a second or two.
 - Room channels are public-by-obscurity (keyed by room UUID); fine for this scope, not hardened
-  for hostile multi-tenant use.
+  for hostile multi-tenant use. (Private rooms add host-gated admission on top.)
 
 ## Future Improvements
 
-- Host transfer / co-host roles; kick & moderation.
-- Support raw video URLs and other providers.
-- Polls, voice notes, "start at the same time" scheduling.
+- Co-host roles; kick & moderation.
+- Support raw video URLs and other providers (would also fix cross-browser voice playback).
+- Bullet comments (danmaku), a reaction heatmap, typing indicators, and an AI "catch me up"
+  chat summary.
 - Server-timestamp-based sync to eliminate clock skew.
-- Mobile-optimized viewing mode.
+- Scheduled rooms ("movie night at 8pm") with a shared lobby countdown.
 
 ## Assumptions
 
 - YouTube is the primary source (the IFrame API gives precise sync control).
-- Desktop-first is acceptable (stated in the brief).
+- Desktop and mobile are both supported; the room reflows to a stacked, tabbed layout on phones.
 - Host-authoritative playback is the right model for "don't permanently desync."
 - Free-tier Supabase/Vercel; built for small, friendly rooms, not large-scale load.
