@@ -19,7 +19,7 @@ export default async function LandingPage() {
   if (profile) redirect("/dashboard");
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex min-h-screen flex-col">
       <header className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
         <span className="flex items-center gap-2 font-semibold tracking-tight">
           <Clapperboard className="size-5 text-primary" /> Watch Together
@@ -36,14 +36,14 @@ export default async function LandingPage() {
 
       <main className="flex flex-1 flex-col">
         {/* Hero */}
-        <section className="mx-auto flex w-full max-w-3xl flex-col items-center gap-6 px-4 py-20 text-center">
-          <span className="rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">
+        <section className="mx-auto flex w-full max-w-3xl flex-col items-center gap-6 px-4 py-24 text-center">
+          <span className="rounded-full border bg-background/60 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur-sm">
             Watch YouTube together, in perfect sync
           </span>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
             Movie nights with friends, <span className="text-primary">no matter the distance</span>.
           </h1>
-          <p className="max-w-xl text-lg text-muted-foreground">
+          <p className="max-w-xl text-lg font-medium text-foreground/80">
             Create a room, paste a YouTube link, and invite friends. Everyone watches together —
             play, pause, and seek stay synced, with live chat and reactions.
           </p>
@@ -61,7 +61,10 @@ export default async function LandingPage() {
         <section className="mx-auto w-full max-w-5xl px-4 pb-24">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((f) => (
-              <div key={f.title} className="rounded-xl border bg-card p-5">
+              <div
+                key={f.title}
+                className="rounded-xl border bg-card/70 p-5 backdrop-blur-sm transition-colors hover:bg-card"
+              >
                 <f.icon className="mb-3 size-6 text-primary" />
                 <h3 className="font-semibold">{f.title}</h3>
                 <p className="mt-1 text-sm text-muted-foreground">{f.desc}</p>

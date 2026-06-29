@@ -20,7 +20,7 @@ export function RoomView({
   return (
     <RoomProvider bundle={bundle} currentUser={currentUser}>
       <PlaybackProvider>
-        <div className="flex h-[100dvh] flex-col">
+        <div className="flex h-[100dvh] flex-col bg-background/75">
           <RoomHeader siteUrl={siteUrl} />
 
           <div className="flex min-h-0 flex-1">

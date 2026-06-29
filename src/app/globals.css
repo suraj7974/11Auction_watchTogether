@@ -127,6 +127,11 @@
   html {
     @apply font-sans;
   }
+  /* Neutral, on-theme text selection (no default blue). */
+  ::selection {
+    background-color: color-mix(in oklch, var(--foreground) 16%, transparent);
+    color: var(--foreground);
+  }
 }
 
 /* Floating emoji reactions */
