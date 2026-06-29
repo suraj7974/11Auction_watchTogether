@@ -5,6 +5,8 @@ import { MessageSquare, SendHorizontal } from "lucide-react";
 
 import { useRoom } from "@/components/room/room-provider";
 import { ReactionBar } from "@/components/room/reactions-overlay";
+import { ActivePoll } from "@/components/room/active-poll";
+import { CreatePollButton } from "@/components/room/create-poll-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -35,6 +37,7 @@ export function ChatPanel() {
 
   return (
     <div className="flex h-full flex-col">
+      <ActivePoll />
       <div className="flex-1 overflow-y-auto px-3 py-3">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-1 text-center text-sm text-muted-foreground">
@@ -80,6 +83,7 @@ export function ChatPanel() {
       <ReactionBar />
 
       <form onSubmit={handleSubmit} className="flex items-center gap-2 p-3">
+        <CreatePollButton />
         <Input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

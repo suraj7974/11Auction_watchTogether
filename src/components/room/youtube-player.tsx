@@ -39,6 +39,7 @@ export function YouTubePlayer() {
           autoplay: 0,
           controls: canControlRef.current ? 1 : 0,
           disablekb: canControlRef.current ? 0 : 1,
+          fs: 0, // we provide our own fullscreen (with side chat)
           modestbranding: 1,
           rel: 0,
           playsinline: 1,

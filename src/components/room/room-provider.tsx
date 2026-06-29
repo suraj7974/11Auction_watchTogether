@@ -65,6 +65,17 @@ type PresenceMeta = {
   role: "host" | "viewer";
 };
 
+// Broadcast events dispatched generically to handlers registered via onBroadcast.
+const GENERIC_BROADCAST_EVENTS = [
+  "reaction",
+  "countdown",
+  "poll_new",
+  "poll_vote",
+  "poll_close",
+  "poll_req",
+  "poll_state",
+];
+
 export function RoomProvider({
   bundle,
   currentUser,
@@ -144,14 +155,16 @@ export function RoomProvider({
       })
       .on("broadcast", { event: "req" }, () => {
         playbackHandlers.current.forEach((h) => h({ request: true }));
-      })
-      .on("broadcast", { event: "reaction" }, ({ payload }) => {
-        broadcastHandlers.current.get("reaction")?.forEach((h) => h(payload));
-      })
-      .on("broadcast", { event: "countdown" }, ({ payload }) => {
-        broadcastHandlers.current.get("countdown")?.forEach((h) => h(payload));
-      })
-      .subscribe((status) => {
+      });
+
+    // Generic broadcast events (reactions, countdown, polls) → registered handlers.
+    GENERIC_BROADCAST_EVENTS.forEach((ev) => {
+      channel.on("broadcast", { event: ev }, ({ payload }) =>
+        broadcastHandlers.current.get(ev)?.forEach((h) => h(payload)),
+      );
+    });
+
+    channel.subscribe((status) => {
         if (status === "SUBSCRIBED") {
           setConnection("live");
           // Runs again on every (re)subscribe, so reconnects re-track + re-sync.

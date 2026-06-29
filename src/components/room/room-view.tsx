@@ -2,6 +2,7 @@
 
 import { RoomProvider } from "@/components/room/room-provider";
 import { PlaybackProvider } from "@/components/room/playback-provider";
+import { PollProvider } from "@/components/room/poll-provider";
 import { RoomHeader } from "@/components/room/room-header";
 import { RoomSidebar } from "@/components/room/room-sidebar";
 import { VideoStage } from "@/components/room/video-stage";
@@ -20,22 +21,24 @@ export function RoomView({
   return (
     <RoomProvider bundle={bundle} currentUser={currentUser}>
       <PlaybackProvider>
-        <div className="flex h-[100dvh] flex-col bg-background/65">
-          <RoomHeader siteUrl={siteUrl} />
+        <PollProvider>
+          <div className="flex h-[100dvh] flex-col bg-background/65">
+            <RoomHeader siteUrl={siteUrl} />
 
-          <div className="flex min-h-0 flex-1">
-            <main className="min-w-0 flex-1 overflow-y-auto p-4 lg:p-6">
-              <div className="mx-auto max-w-4xl">
-                <VideoStage />
-                <HostControls />
-              </div>
-            </main>
+            <div className="flex min-h-0 flex-1">
+              <main className="min-w-0 flex-1 overflow-y-auto p-4 lg:p-6">
+                <div className="mx-auto max-w-4xl">
+                  <VideoStage />
+                  <HostControls />
+                </div>
+              </main>
 
-            <aside className="hidden w-[360px] shrink-0 border-l border-border/50 bg-card/40 backdrop-blur-md md:flex md:flex-col">
-              <RoomSidebar />
-            </aside>
+              <aside className="hidden w-[360px] shrink-0 border-l border-border/50 bg-card/40 backdrop-blur-md md:flex md:flex-col">
+                <RoomSidebar />
+              </aside>
+            </div>
           </div>
-        </div>
+        </PollProvider>
       </PlaybackProvider>
     </RoomProvider>
   );

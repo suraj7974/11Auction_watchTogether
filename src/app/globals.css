@@ -127,6 +127,11 @@
   html {
     @apply font-sans;
   }
+  /* Tailwind v4 no longer defaults buttons to a pointer cursor — restore it. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
   /* Neutral, on-theme text selection (no default blue). */
   ::selection {
     background-color: color-mix(in oklch, var(--foreground) 16%, transparent);
