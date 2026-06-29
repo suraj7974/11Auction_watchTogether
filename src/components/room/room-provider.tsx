@@ -35,6 +35,7 @@ type RoomContextValue = {
   messages: Message[];
   queue: QueueItem[];
   participants: ParticipantView[];
+  connection: "connecting" | "live" | "reconnecting";
   sendMessage: (content: string) => Promise<void>;
   addToQueue: (url: string) => Promise<boolean>;
   removeFromQueue: (id: string) => Promise<void>;
@@ -80,6 +81,7 @@ export function RoomProvider({
   const [messages, setMessages] = useState<Message[]>(bundle.messages);
   const [queue, setQueue] = useState<QueueItem[]>(bundle.queue);
   const [participants, setParticipants] = useState<ParticipantView[]>(bundle.participants);
+  const [connection, setConnection] = useState<"connecting" | "live" | "reconnecting">("connecting");
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const playbackHandlers = useRef<Set<PlaybackHandler>>(new Set());
@@ -151,6 +153,8 @@ export function RoomProvider({
       })
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
+          setConnection("live");
+          // Runs again on every (re)subscribe, so reconnects re-track + re-sync.
           void channel.track({
             userId: currentUser.id,
             displayName: currentUser.displayName,
@@ -159,6 +163,8 @@ export function RoomProvider({
           } satisfies PresenceMeta);
           // Ask the host for the current playback state (late-joiner sync).
           void channel.send({ type: "broadcast", event: "req", payload: {} });
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          setConnection("reconnecting");
         }
       });
 
@@ -317,6 +323,7 @@ export function RoomProvider({
     messages,
     queue,
     participants,
+    connection,
     sendMessage,
     addToQueue,
     removeFromQueue,

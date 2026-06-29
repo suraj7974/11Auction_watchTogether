@@ -15,11 +15,15 @@ export function YouTubePlayer() {
   const playerRef = useRef<YT.Player | null>(null);
 
   const registerRef = useRef(registerPlayer);
-  registerRef.current = registerPlayer;
   const stateRef = useRef(handleStateChange);
-  stateRef.current = handleStateChange;
   // Host gets native controls; viewers get a controls-free, follow-only player.
   const canControlRef = useRef(canControl);
+
+  // Keep the latest callbacks without re-creating the player.
+  useEffect(() => {
+    registerRef.current = registerPlayer;
+    stateRef.current = handleStateChange;
+  });
 
   useEffect(() => {
     let cancelled = false;

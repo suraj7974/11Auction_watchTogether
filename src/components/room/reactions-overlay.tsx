@@ -20,7 +20,9 @@ export function ReactionsFloaters() {
     setTimeout(() => setFloaters((prev) => prev.filter((f) => f.id !== id)), 2800);
   };
   const spawnRef = useRef(spawn);
-  spawnRef.current = spawn;
+  useEffect(() => {
+    spawnRef.current = spawn;
+  });
 
   useEffect(
     () => onBroadcast("reaction", (payload) => spawnRef.current((payload as { emoji: string }).emoji)),

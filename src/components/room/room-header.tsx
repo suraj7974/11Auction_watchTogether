@@ -9,9 +9,16 @@ import { useRoom } from "@/components/room/room-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 
+const CONNECTION_LABEL = {
+  connecting: { dot: "bg-amber-500", text: "Connecting…" },
+  live: { dot: "bg-emerald-500", text: "Live" },
+  reconnecting: { dot: "bg-amber-500 animate-pulse", text: "Reconnecting…" },
+} as const;
+
 export function RoomHeader({ siteUrl }: { siteUrl: string }) {
-  const { room, participants } = useRoom();
+  const { room, participants, connection } = useRoom();
   const [copied, setCopied] = useState(false);
+  const status = CONNECTION_LABEL[connection];
 
   async function copyInvite() {
     const link = `${siteUrl}/room/${room.code}`;
@@ -44,7 +51,14 @@ export function RoomHeader({ siteUrl }: { siteUrl: string }) {
         </Badge>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        <span
+          className="flex items-center gap-1.5 text-xs text-muted-foreground"
+          title={`Realtime: ${status.text}`}
+        >
+          <span className={`size-2 rounded-full ${status.dot}`} />
+          {status.text}
+        </span>
         <span className="flex items-center gap-1 text-sm text-muted-foreground">
           <Users className="size-4" />
           {participants.length}

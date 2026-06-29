@@ -240,9 +240,11 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
 
   // Register a single realtime handler (host responds to requests; viewer follows).
   const emitRef = useRef(emitState);
-  emitRef.current = emitState;
   const applyRef = useRef(applyState);
-  applyRef.current = applyState;
+  useEffect(() => {
+    emitRef.current = emitState;
+    applyRef.current = applyState;
+  });
 
   useEffect(() => {
     return onPlaybackMessage((msg) => {
