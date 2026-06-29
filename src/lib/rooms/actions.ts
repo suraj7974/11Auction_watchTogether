@@ -78,6 +78,31 @@ export async function joinRoom(
   return joinByCode(code);
 }
 
+/** Transfer host control of a room to another participant. Only the current
+ *  host may call this. */
+export async function transferRoomHost(
+  code: string,
+  targetUserId: string,
+): Promise<RoomActionState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in." };
+
+  const { data: room } = await supabase
+    .from("rooms")
+    .select("id, host_id")
+    .eq("code", code)
+    .maybeSingle();
+  if (!room) return { error: "Room not found." };
+  if (room.host_id !== user.id) return { error: "Only the host can transfer control." };
+  if (targetUserId === user.id) return {};
+
+  await claimRoomHost(room.id, targetUserId, user.id);
+  return {};
+}
+
 /** One-click join of the seeded demo room — the joiner becomes host so the demo
  *  is controllable (its seeded host is never online). */
 export async function joinDemoRoom() {

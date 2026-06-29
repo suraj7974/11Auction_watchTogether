@@ -13,6 +13,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
+import { transferRoomHost } from "@/lib/rooms/actions";
 import { parseYouTubeId, youTubeWatchUrl } from "@/lib/youtube";
 import type { Message, QueueItem, Room } from "@/types/database";
 import type { CurrentUser, ParticipantView, RoomBundle } from "@/types/room";
@@ -31,7 +32,9 @@ type PlaybackHandler = (msg: PlaybackBroadcast | { request: true }) => void;
 type RoomContextValue = {
   room: Room;
   currentUser: CurrentUser;
+  hostId: string;
   isHost: boolean;
+  transferHost: (targetUserId: string) => Promise<void>;
   messages: Message[];
   queue: QueueItem[];
   participants: ParticipantView[];
@@ -87,7 +90,10 @@ export function RoomProvider({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const { room } = bundle;
-  const isHost = room.host_id === currentUser.id;
+
+  // Host is reactive so control can be transferred mid-session.
+  const [hostId, setHostId] = useState(room.host_id);
+  const isHost = hostId === currentUser.id;
 
   const [messages, setMessages] = useState<Message[]>(bundle.messages);
   const [queue, setQueue] = useState<QueueItem[]>(bundle.queue);
@@ -97,6 +103,10 @@ export function RoomProvider({
   const channelRef = useRef<RealtimeChannel | null>(null);
   const playbackHandlers = useRef<Set<PlaybackHandler>>(new Set());
   const broadcastHandlers = useRef<Map<string, Set<(payload: unknown) => void>>>(new Map());
+  const hostIdRef = useRef(hostId);
+  useEffect(() => {
+    hostIdRef.current = hostId;
+  });
 
   // --- realtime channel: presence + broadcast (chat, queue, playback) ---------
   useEffect(() => {
@@ -113,7 +123,7 @@ export function RoomProvider({
         userId: currentUser.id,
         displayName: currentUser.displayName,
         avatarColor: currentUser.avatarColor,
-        role: isHost ? "host" : "viewer",
+        role: hostIdRef.current === currentUser.id ? "host" : "viewer",
       });
       Object.values(state)
         .flat()
@@ -150,6 +160,9 @@ export function RoomProvider({
         const id = (payload as { id: string }).id;
         setQueue((prev) => prev.filter((q) => q.id !== id));
       })
+      .on("broadcast", { event: "host_change" }, ({ payload }) => {
+        setHostId((payload as { hostId: string }).hostId);
+      })
       .on("broadcast", { event: "pb" }, ({ payload }) => {
         playbackHandlers.current.forEach((h) => h(payload as PlaybackBroadcast));
       })
@@ -165,27 +178,31 @@ export function RoomProvider({
     });
 
     channel.subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          setConnection("live");
-          // Runs again on every (re)subscribe, so reconnects re-track + re-sync.
-          void channel.track({
-            userId: currentUser.id,
-            displayName: currentUser.displayName,
-            avatarColor: currentUser.avatarColor,
-            role: isHost ? "host" : "viewer",
-          } satisfies PresenceMeta);
-          // Ask the host for the current playback state (late-joiner sync).
-          void channel.send({ type: "broadcast", event: "req", payload: {} });
-        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-          setConnection("reconnecting");
-        }
-      });
+      if (status === "SUBSCRIBED") {
+        setConnection("live");
+        // Ask the host for the current playback state (late-joiner sync).
+        void channel.send({ type: "broadcast", event: "req", payload: {} });
+      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        setConnection("reconnecting");
+      }
+    });
 
     return () => {
       channelRef.current = null;
       void supabase.removeChannel(channel);
     };
-  }, [supabase, room.id, currentUser, isHost]);
+  }, [supabase, room.id, currentUser]);
+
+  // Track presence (initial join, reconnect, and whenever host role changes).
+  useEffect(() => {
+    if (connection !== "live") return;
+    void channelRef.current?.track({
+      userId: currentUser.id,
+      displayName: currentUser.displayName,
+      avatarColor: currentUser.avatarColor,
+      role: isHost ? "host" : "viewer",
+    } satisfies PresenceMeta);
+  }, [connection, isHost, currentUser]);
 
   // --- chat -------------------------------------------------------------------
   const sendMessage = useCallback(
@@ -293,6 +310,27 @@ export function RoomProvider({
     [supabase, queue],
   );
 
+  // --- host transfer ----------------------------------------------------------
+  const transferHost = useCallback(
+    async (targetUserId: string) => {
+      if (hostId !== currentUser.id || targetUserId === currentUser.id) return;
+      const res = await transferRoomHost(room.code, targetUserId);
+      if (res.error) {
+        toast.error("Couldn't transfer host", { description: res.error });
+        return;
+      }
+      setHostId(targetUserId);
+      void channelRef.current?.send({
+        type: "broadcast",
+        event: "host_change",
+        payload: { hostId: targetUserId },
+      });
+      const name = participants.find((p) => p.userId === targetUserId)?.displayName;
+      toast.success(name ? `${name} is now the host` : "Host transferred");
+    },
+    [hostId, currentUser.id, room.code, participants],
+  );
+
   // --- playback wiring (used by PlaybackProvider) -----------------------------
   const broadcastPlayback = useCallback((state: PlaybackBroadcast) => {
     void channelRef.current?.send({ type: "broadcast", event: "pb", payload: state });
@@ -332,7 +370,9 @@ export function RoomProvider({
   const value: RoomContextValue = {
     room,
     currentUser,
+    hostId,
     isHost,
+    transferHost,
     messages,
     queue,
     participants,

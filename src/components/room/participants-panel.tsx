@@ -1,13 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { Crown, Users } from "lucide-react";
 
 import { useRoom } from "@/components/room/room-provider";
 import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 export function ParticipantsPanel() {
-  const { participants, currentUser } = useRoom();
+  const { participants, currentUser, isHost, hostId, transferHost } = useRoom();
+  const [busy, setBusy] = useState<string | null>(null);
 
   if (participants.length === 0) {
     return (
@@ -18,24 +21,50 @@ export function ParticipantsPanel() {
     );
   }
 
+  const makeHost = async (userId: string) => {
+    setBusy(userId);
+    await transferHost(userId);
+    setBusy(null);
+  };
+
   return (
     <ul className="flex flex-col gap-1 p-2">
-      {participants.map((p) => (
-        <li key={p.userId} className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted">
-          <UserAvatar name={p.displayName} color={p.avatarColor} className="size-7" />
-          <span className="flex-1 truncate text-sm font-medium">
-            {p.displayName}
-            {p.userId === currentUser.id && (
-              <span className="ml-1 text-xs font-normal text-muted-foreground">(you)</span>
+      {participants.map((p) => {
+        const isThisHost = p.userId === hostId;
+        const canPromote = isHost && p.userId !== currentUser.id && !isThisHost;
+        return (
+          <li
+            key={p.userId}
+            className="group flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted"
+          >
+            <UserAvatar name={p.displayName} color={p.avatarColor} className="size-7" />
+            <span className="flex-1 truncate text-sm font-medium">
+              {p.displayName}
+              {p.userId === currentUser.id && (
+                <span className="ml-1 text-xs font-normal text-muted-foreground">(you)</span>
+              )}
+            </span>
+
+            {canPromote && (
+              <Button
+                size="xs"
+                variant="outline"
+                disabled={busy === p.userId}
+                onClick={() => makeHost(p.userId)}
+                className="opacity-0 transition-opacity group-hover:opacity-100 disabled:opacity-50"
+              >
+                {busy === p.userId ? "…" : "Make host"}
+              </Button>
             )}
-          </span>
-          {p.role === "host" && (
-            <Badge variant="secondary" className="gap-1">
-              <Crown className="size-3" /> Host
-            </Badge>
-          )}
-        </li>
-      ))}
+
+            {isThisHost && (
+              <Badge variant="secondary" className="gap-1">
+                <Crown className="size-3" /> Host
+              </Badge>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
