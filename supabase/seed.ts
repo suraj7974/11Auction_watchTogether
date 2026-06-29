@@ -30,8 +30,16 @@ const admin = createClient(url, serviceKey, {
 const DEMO_ROOM_CODE = "DEMO01";
 
 const DEMO_USERS = [
-  { email: "demo@watchtogether.app", password: "watchparty", display_name: "Demo Host" },
-  { email: "friend@watchtogether.app", password: "watchparty", display_name: "Demo Friend" },
+  {
+    email: "demo@watchtogether.app",
+    password: "watchparty",
+    display_name: "Demo Host",
+  },
+  {
+    email: "friend@watchtogether.app",
+    password: "watchparty",
+    display_name: "Demo Friend",
+  },
 ];
 
 const DEMO_QUEUE = [
@@ -48,7 +56,11 @@ const DEMO_QUEUE = [
 ];
 
 /** Create the user if missing, otherwise reuse the existing one. Returns its id. */
-async function ensureUser(email: string, password: string, displayName: string): Promise<string> {
+async function ensureUser(
+  email: string,
+  password: string,
+  displayName: string,
+): Promise<string> {
   const created = await admin.auth.admin.createUser({
     email,
     password,
@@ -62,10 +74,16 @@ async function ensureUser(email: string, password: string, displayName: string):
   }
 
   // Already exists — find it.
-  const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const { data, error } = await admin.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  });
   if (error) throw error;
   const existing = data.users.find((u) => u.email === email);
-  if (!existing) throw new Error(`Could not create or find user ${email}: ${created.error?.message}`);
+  if (!existing)
+    throw new Error(
+      `Could not create or find user ${email}: ${created.error?.message}`,
+    );
   console.log(`  = reusing user ${email}`);
   return existing.id;
 }
@@ -102,14 +120,22 @@ async function main() {
   const { data: items, error: queueErr } = await admin
     .from("queue_items")
     .insert(
-      DEMO_QUEUE.map((q, i) => ({ ...q, room_id: room.id, position: i, added_by: hostId })),
+      DEMO_QUEUE.map((q, i) => ({
+        ...q,
+        room_id: room.id,
+        position: i,
+        added_by: hostId,
+      })),
     )
     .select();
   if (queueErr) throw queueErr;
   console.log(`  + added ${items.length} queue items`);
 
   // 5. Point the room at the first queued video.
-  await admin.from("rooms").update({ current_item_id: items[0].id }).eq("id", room.id);
+  await admin
+    .from("rooms")
+    .update({ current_item_id: items[0].id })
+    .eq("id", room.id);
 
   // 6. Host joins as participant.
   await admin
@@ -129,7 +155,7 @@ async function main() {
       room_id: room.id,
       user_id: hostId,
       display_name: "Demo Host",
-      content: "Hey! Queue is ready 🎬",
+      content: "Hey! Queue is ready",
       type: "chat",
     },
   ]);

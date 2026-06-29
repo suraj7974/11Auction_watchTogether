@@ -40,7 +40,10 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
     return { error: friendlyAuthError(error.message) };
   }
 
-  redirect(next.startsWith("/") ? next : "/");
+  // Deep links (e.g. a room invite) take you straight there; otherwise show the
+  // welcome intro on the dashboard.
+  if (next.startsWith("/") && next !== "/") redirect(next);
+  redirect("/dashboard?welcome=1");
 }
 
 /** Create an account. A profile row is auto-created by the DB trigger. */
@@ -70,14 +73,14 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
     };
   }
 
-  redirect("/");
+  redirect("/dashboard?welcome=1");
 }
 
 /** One-click demo login using the seeded demo account. */
 export async function signInDemo() {
   const supabase = await createClient();
   await supabase.auth.signInWithPassword(DEMO_CREDENTIALS);
-  redirect("/");
+  redirect("/dashboard?welcome=1");
 }
 
 export async function signOut() {
