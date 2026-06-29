@@ -51,7 +51,8 @@ export function ParticipantsPanel() {
                 variant="outline"
                 disabled={busy === p.userId}
                 onClick={() => makeHost(p.userId)}
-                className="opacity-0 transition-opacity group-hover:opacity-100 disabled:opacity-50"
+                // Always visible on mobile (no hover); hover-revealed on desktop.
+                className="opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
               >
                 {busy === p.userId ? "…" : "Make host"}
               </Button>

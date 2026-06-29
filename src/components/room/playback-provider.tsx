@@ -30,6 +30,7 @@ type PlaybackContextValue = {
   registerPlayer: (player: YT.Player) => void;
   handleStateChange: (state: number) => void;
   handlePlayerError: () => void;
+  handleApiChange: () => void;
 };
 
 const PlaybackContext = createContext<PlaybackContextValue | null>(null);
@@ -87,12 +88,22 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
   const emitState = useCallback(() => {
     const player = playerRef.current;
     if (!player) return;
+    let captionTrack: unknown = null;
+    try {
+      captionTrack = (player as unknown as { getOption?: (m: string, o: string) => unknown }).getOption?.(
+        "captions",
+        "track",
+      );
+    } catch {
+      // captions module may not be ready
+    }
     const state: PlaybackBroadcast = {
       currentItemId: currentItemIdRef.current,
       videoId: loadedVideoRef.current,
       positionSeconds: player.getCurrentTime?.() ?? 0,
       isPlaying: player.getPlayerState?.() === YT.PlayerState.PLAYING,
       emittedAt: Date.now(),
+      captionTrack,
     };
     broadcastPlayback(state);
   }, [broadcastPlayback]);
@@ -119,6 +130,23 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     const ps = player.getPlayerState?.();
     if (s.isPlaying && ps !== YT.PlayerState.PLAYING) player.playVideo();
     if (!s.isPlaying && ps === YT.PlayerState.PLAYING) player.pauseVideo();
+
+    // Sync captions (CC on/off + language) to match the host.
+    try {
+      const cc = player as unknown as {
+        loadModule?: (m: string) => void;
+        setOption?: (m: string, o: string, v: unknown) => void;
+      };
+      const track = s.captionTrack as { languageCode?: string } | null | undefined;
+      if (track && track.languageCode) {
+        cc.loadModule?.("captions");
+        cc.setOption?.("captions", "track", track);
+      } else {
+        cc.setOption?.("captions", "track", {});
+      }
+    } catch {
+      // captions module not available for this video
+    }
   }, [setCurrent]);
 
   // Initial position for a (possibly late) joiner from the room snapshot.
@@ -251,6 +279,11 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     if (isHost) next();
   }, [isHost, hasNext, next]);
 
+  // Captions (or other modules) changed — host re-broadcasts so viewers match.
+  const handleApiChange = useCallback(() => {
+    if (isHost) emitState();
+  }, [isHost, emitState]);
+
   // Register a single realtime handler (host responds to requests; viewer follows).
   const emitRef = useRef(emitState);
   const applyRef = useRef(applyState);
@@ -296,6 +329,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     registerPlayer,
     handleStateChange,
     handlePlayerError,
+    handleApiChange,
   };
 
   return <PlaybackContext.Provider value={value}>{children}</PlaybackContext.Provider>;

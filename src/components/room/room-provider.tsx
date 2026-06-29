@@ -25,6 +25,7 @@ export type PlaybackBroadcast = {
   positionSeconds: number;
   isPlaying: boolean;
   emittedAt: number;
+  captionTrack?: unknown; // YouTube caption track ({} = off), synced host → viewers
 };
 
 type PlaybackHandler = (msg: PlaybackBroadcast | { request: true }) => void;

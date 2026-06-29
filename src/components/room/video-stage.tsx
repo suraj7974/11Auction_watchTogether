@@ -15,12 +15,24 @@ export function VideoStage() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
+  const [isPortrait, setIsPortrait] = useState(false);
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(document.fullscreenElement === rootRef.current);
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(orientation: portrait)");
+    const update = () => setIsPortrait(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  // In portrait, fullscreen is video-only (no docked chat). Landscape keeps it.
+  const fsChatAvailable = isFullscreen && !isPortrait;
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) void document.exitFullscreen();
@@ -74,7 +86,7 @@ export function VideoStage() {
               isFullscreen ? "bottom-16" : "bottom-3",
             )}
           >
-            {isFullscreen && (
+            {fsChatAvailable && (
               <button
                 type="button"
                 onClick={() => setChatOpen((o) => !o)}
@@ -97,8 +109,8 @@ export function VideoStage() {
           </div>
         </div>
 
-        {/* Chat column — only in fullscreen, YouTube-style */}
-        {isFullscreen && chatOpen && (
+        {/* Chat column — only in landscape fullscreen, YouTube-style */}
+        {fsChatAvailable && chatOpen && (
           <aside className="flex w-[340px] shrink-0 flex-col border-l border-white/10 bg-background">
             <div className="flex h-11 items-center justify-between border-b px-3 text-sm font-medium">
               <span>Live chat</span>
