@@ -41,6 +41,7 @@ type RoomContextValue = {
   participants: ParticipantView[];
   connection: "connecting" | "live" | "reconnecting";
   sendMessage: (content: string) => Promise<void>;
+  sendVoiceNote: (blob: Blob, durationSeconds: number) => Promise<void>;
   addToQueue: (url: string) => Promise<boolean>;
   removeFromQueue: (id: string) => Promise<void>;
   // Realtime wiring used by the PlaybackProvider:
@@ -247,6 +248,60 @@ export function RoomProvider({
     [supabase, room.id, currentUser],
   );
 
+  // --- voice notes ------------------------------------------------------------
+  // A voice message's content is "<publicUrl>|<durationSeconds>".
+  const sendVoiceNote = useCallback(
+    async (blob: Blob, durationSeconds: number) => {
+      const dur = Math.max(1, Math.round(durationSeconds));
+      const tempId = `temp-${crypto.randomUUID()}`;
+      const objectUrl = URL.createObjectURL(blob);
+      const optimistic: Message = {
+        id: tempId,
+        room_id: room.id,
+        user_id: currentUser.id,
+        display_name: currentUser.displayName,
+        content: `${objectUrl}|${dur}`,
+        type: "voice",
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, optimistic]);
+
+      const fail = (description?: string) => {
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        URL.revokeObjectURL(objectUrl);
+        toast.error("Couldn't send voice note", { description });
+      };
+
+      const path = `${room.id}/${crypto.randomUUID()}.webm`;
+      const { error: upErr } = await supabase.storage
+        .from("voice-notes")
+        .upload(path, blob, { contentType: blob.type || "audio/webm", upsert: false });
+      if (upErr) return fail(upErr.message);
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("voice-notes").getPublicUrl(path);
+
+      const { data, error } = await supabase
+        .from("messages")
+        .insert({
+          room_id: room.id,
+          user_id: currentUser.id,
+          display_name: currentUser.displayName,
+          content: `${publicUrl}|${dur}`,
+          type: "voice",
+        })
+        .select()
+        .single();
+      if (error || !data) return fail(error?.message);
+
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? data : m)));
+      URL.revokeObjectURL(objectUrl);
+      void channelRef.current?.send({ type: "broadcast", event: "chat", payload: data });
+    },
+    [supabase, room.id, currentUser],
+  );
+
   // --- queue ------------------------------------------------------------------
   const addToQueue = useCallback(
     async (url: string) => {
@@ -380,6 +435,7 @@ export function RoomProvider({
     participants,
     connection,
     sendMessage,
+    sendVoiceNote,
     addToQueue,
     removeFromQueue,
     broadcastPlayback,

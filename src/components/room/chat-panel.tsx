@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MessageSquare, SendHorizontal } from "lucide-react";
+import { Mic, MessageSquare, SendHorizontal, Trash2 } from "lucide-react";
 
 import { useRoom } from "@/components/room/room-provider";
 import { ReactionBar } from "@/components/room/reactions-overlay";
 import { ActivePoll } from "@/components/room/active-poll";
 import { CreatePollButton } from "@/components/room/create-poll-button";
+import { VoiceMessage } from "@/components/room/voice-message";
+import { useVoiceRecorder, MAX_VOICE_SECONDS } from "@/components/room/use-voice-recorder";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -15,11 +17,18 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function clock(s: number) {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
 export function ChatPanel() {
-  const { messages, currentUser, sendMessage } = useRoom();
+  const { messages, currentUser, sendMessage, sendVoiceNote } = useRoom();
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { recording, seconds, start, finish, cancel } = useVoiceRecorder();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -34,6 +43,17 @@ export function ChatPanel() {
     await sendMessage(content);
     setSending(false);
   }
+
+  async function sendRecording() {
+    const blob = await finish();
+    if (blob) await sendVoiceNote(blob, seconds || 1);
+  }
+
+  // Auto-send when the max duration is reached.
+  useEffect(() => {
+    if (recording && seconds >= MAX_VOICE_SECONDS) void sendRecording();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recording, seconds]);
 
   return (
     <div className="flex h-full flex-col">
@@ -64,14 +84,18 @@ export function ChatPanel() {
                     </span>
                     <span>{formatTime(m.created_at)}</span>
                   </div>
-                  <div
-                    className={cn(
-                      "max-w-[85%] rounded-lg px-3 py-1.5 text-sm",
-                      mine ? "bg-primary text-primary-foreground" : "bg-muted",
-                    )}
-                  >
-                    {m.content}
-                  </div>
+                  {m.type === "voice" ? (
+                    <VoiceMessage content={m.content} mine={mine} />
+                  ) : (
+                    <div
+                      className={cn(
+                        "max-w-[85%] rounded-lg px-3 py-1.5 text-sm",
+                        mine ? "bg-primary text-primary-foreground" : "bg-muted",
+                      )}
+                    >
+                      {m.content}
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -82,19 +106,50 @@ export function ChatPanel() {
 
       <ReactionBar />
 
-      <form onSubmit={handleSubmit} className="flex items-center gap-2 p-3">
-        <CreatePollButton />
-        <Input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="Message…"
-          maxLength={500}
-          autoComplete="off"
-        />
-        <Button type="submit" size="icon" disabled={!draft.trim() || sending} aria-label="Send">
-          <SendHorizontal className="size-4" />
-        </Button>
-      </form>
+      {recording ? (
+        <div className="flex items-center gap-2 p-3">
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            onClick={cancel}
+            aria-label="Discard recording"
+          >
+            <Trash2 className="size-4 text-destructive" />
+          </Button>
+          <div className="flex flex-1 items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-sm">
+            <span className="size-2 animate-pulse rounded-full bg-red-500" />
+            <span className="tabular-nums">{clock(seconds)}</span>
+            <span className="text-muted-foreground">Recording…</span>
+          </div>
+          <Button type="button" size="icon" onClick={sendRecording} aria-label="Send voice note">
+            <SendHorizontal className="size-4" />
+          </Button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="flex items-center gap-2 p-3">
+          <CreatePollButton />
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            onClick={start}
+            aria-label="Record a voice note"
+          >
+            <Mic className="size-4" />
+          </Button>
+          <Input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Message…"
+            maxLength={500}
+            autoComplete="off"
+          />
+          <Button type="submit" size="icon" disabled={!draft.trim() || sending} aria-label="Send">
+            <SendHorizontal className="size-4" />
+          </Button>
+        </form>
+      )}
     </div>
   );
 }

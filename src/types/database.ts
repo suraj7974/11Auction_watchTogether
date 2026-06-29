@@ -7,7 +7,7 @@
 export const DB_SCHEMA = "eleven_auction" as const;
 
 export type RoomStatus = "lobby" | "watching" | "ended";
-export type MessageType = "chat" | "system";
+export type MessageType = "chat" | "system" | "voice";
 export type ParticipantRole = "host" | "viewer";
 
 export type Profile = {
