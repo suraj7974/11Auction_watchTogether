@@ -61,31 +61,31 @@ export function RoomHeader({ siteUrl }: { siteUrl: string }) {
 
   return (
     <header className="flex h-14 items-center justify-between gap-3 border-b border-border/50 bg-background/50 px-4 backdrop-blur-md">
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
         <button
           type="button"
           onClick={leave}
           aria-label="Leave room"
-          className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+          className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }), "shrink-0")}
         >
           <ArrowLeft className="size-4" />
         </button>
-        <div className="flex items-center gap-2">
-          <Clapperboard className="size-5 text-primary" />
-          <h1 className="font-semibold tracking-tight">{room.name}</h1>
+        <div className="flex min-w-0 items-center gap-2">
+          <Clapperboard className="size-5 shrink-0 text-primary" />
+          <h1 className="truncate font-semibold tracking-tight">{room.name}</h1>
         </div>
-        <Badge variant="outline" className="font-mono tracking-widest">
+        <Badge variant="outline" className="hidden shrink-0 font-mono tracking-widest sm:inline-flex">
           {room.code}
         </Badge>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <span
           className="flex items-center gap-1.5 text-xs text-muted-foreground"
           title={`Realtime: ${status.text}`}
         >
           <span className={`size-2 rounded-full ${status.dot}`} />
-          {status.text}
+          <span className="hidden sm:inline">{status.text}</span>
         </span>
         <span className="flex items-center gap-1 text-sm text-muted-foreground">
           <Users className="size-4" />
@@ -93,7 +93,7 @@ export function RoomHeader({ siteUrl }: { siteUrl: string }) {
         </span>
         <Button variant="outline" size="sm" onClick={copyInvite}>
           {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-          Invite
+          <span className="hidden sm:inline">Invite</span>
         </Button>
       </div>
 

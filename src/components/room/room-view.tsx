@@ -25,15 +25,16 @@ export function RoomView({
           <div className="flex h-[100dvh] flex-col bg-background/65">
             <RoomHeader siteUrl={siteUrl} />
 
-            <div className="flex min-h-0 flex-1">
-              <main className="min-w-0 flex-1 overflow-y-auto p-4 lg:p-6">
+            {/* Stacks on mobile (video on top, tabs fill the rest); row on desktop. */}
+            <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+              <main className="min-w-0 shrink-0 p-3 md:flex-1 md:overflow-y-auto md:p-6">
                 <div className="mx-auto max-w-4xl">
                   <VideoStage />
                   <HostControls />
                 </div>
               </main>
 
-              <aside className="hidden w-[360px] shrink-0 border-l border-border/50 bg-card/40 backdrop-blur-md md:flex md:flex-col">
+              <aside className="flex min-h-0 flex-1 flex-col border-t border-border/50 bg-card/40 backdrop-blur-md md:flex-none md:w-[360px] md:border-t-0 md:border-l">
                 <RoomSidebar />
               </aside>
             </div>

@@ -56,7 +56,7 @@ export function HostControls() {
         <Timer className="size-4" /> Countdown
       </Button>
 
-      <span className="ml-auto text-xs text-muted-foreground">
+      <span className="ml-auto hidden text-xs text-muted-foreground sm:inline">
         You&apos;re the host — you control playback for the room.
       </span>
     </div>
