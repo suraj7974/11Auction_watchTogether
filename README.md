@@ -10,8 +10,9 @@ live chat, presence, emoji reactions, a shared queue, and a synchronized start c
 
 ## Live Demo
 
-- **App:** _<add your Vercel URL here after deploying>_
+- **App:** _<https://11-auction-watch-together.vercel.app/room/TRRNE8>_
 - It is a **public demo**: use the seeded credentials below (no email confirmation needed).
+- Or you can just login to demo account by clicking **Try the demo** on the login page.
 
 ## Demo Credentials
 
@@ -46,19 +47,19 @@ in as the host in one click.
 - **Realtime chat** · **Participants list** · **Late-joiner sync** · Room persistence
 
 **Extras**
-- 🔒 **Host-only controls** (viewers can't desync the room)
-- 🤝 **Host transfer** — hand the room to anyone; leaving prompts a (deniable) hand-off
-- 🚪 **Private rooms with knock-to-join** — the host admits each person individually
-- ❤️ **Emoji reactions** floating over the video (full picker)
-- 📊 **Live polls** — the host asks, everyone votes, results update in realtime
-- 🎙️ **Voice notes** — record and send audio clips in chat
-- 💬 **Synced captions** — the host's caption track toggles for everyone
-- 🖥️ **Fullscreen theater mode** with an optional YouTube-style side chat
-- 📱 **Mobile-friendly viewing** — stacked video + tabbed chat/queue/people
-- 📺 **Watch queue** with auto-advance (and host auto-skip on a dead video)
-- ⏱️ **Synchronized start countdown** (3 · 2 · 1 · Go!)
-- 🟢 **Presence** + live **connection status** indicator
-- 🔁 **Reconnect handling** (re-syncs on reconnect)
+-  **Host-only controls** (viewers can't desync the room)
+-  **Host transfer** — hand the room to anyone; leaving prompts a (deniable) hand-off
+-  **Private rooms with knock-to-join** — the host admits each person individually
+-  **Emoji reactions** floating over the video (full picker)
+-  **Live polls** — the host asks, everyone votes, results update in realtime
+-  **Voice notes** — record and send audio clips in chat
+-  **Synced captions** — the host's caption track toggles for everyone
+-  **Fullscreen theater mode** with an optional YouTube-style side chat
+-  **Mobile-friendly viewing** — stacked video + tabbed chat/queue/people
+-  **Watch queue** with auto-advance (and host auto-skip on a dead video)
+-  **Synchronized start countdown** (3 · 2 · 1 · Go!)
+-  **Presence** + live **connection status** indicator
+-  **Reconnect handling** (re-syncs on reconnect)
 
 ## Architecture
 
@@ -138,7 +139,7 @@ manual decisions are in **[`ai-transcripts/`](ai-transcripts/)** (see
 
 ```bash
 pnpm install
-cp .env.example .env.local     # fill in your Supabase keys (see below)
+cp .env.example .env.local
 ```
 
 **Supabase setup (one time):**
@@ -153,7 +154,7 @@ cp .env.example .env.local     # fill in your Supabase keys (see below)
 
 **Run it:**
 ```bash
-pnpm dev      # http://localhost:3000
+pnpm dev
 ```
 
 Useful scripts: `pnpm build`, `pnpm start`, `pnpm lint`, `pnpm seed`.
@@ -183,7 +184,6 @@ See [`.env.example`](.env.example). All are required:
 
 ## Future Improvements
 
-- Co-host roles; kick & moderation.
 - Support raw video URLs and other providers (would also fix cross-browser voice playback).
 - Bullet comments (danmaku), a reaction heatmap, typing indicators, and an AI "catch me up"
   chat summary.
