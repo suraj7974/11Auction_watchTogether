@@ -29,21 +29,24 @@ export async function getMyRooms(): Promise<MyRoom[]> {
   } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const { data: parts } = await supabase
+  const { data: parts, error: partsErr } = await supabase
     .from("room_participants")
     .select("room_id, role, joined_at")
     .eq("user_id", user.id)
     .order("joined_at", { ascending: false });
 
+  // A real failure should surface as an error state, not an empty list.
+  if (partsErr) throw new Error(`Failed to load your rooms: ${partsErr.message}`);
   if (!parts?.length) return [];
 
-  const { data: rooms } = await supabase
+  const { data: rooms, error: roomsErr } = await supabase
     .from("rooms")
     .select("*")
     .in(
       "id",
       parts.map((p) => p.room_id),
     );
+  if (roomsErr) throw new Error(`Failed to load your rooms: ${roomsErr.message}`);
 
   const byId = new Map((rooms ?? []).map((r) => [r.id, r]));
   return parts
@@ -62,11 +65,12 @@ export async function getRoomByCode(code: string): Promise<Room | null> {
 export async function getRoomBundle(code: string): Promise<RoomBundle | null> {
   const supabase = await createClient();
 
-  const { data: room } = await supabase
+  const { data: room, error: roomErr } = await supabase
     .from("rooms")
     .select("*")
     .eq("code", code)
     .maybeSingle();
+  if (roomErr) throw new Error(`Failed to load the room: ${roomErr.message}`);
   if (!room) return null;
 
   const [{ data: queue }, { data: messages }, { data: parts }] = await Promise.all([

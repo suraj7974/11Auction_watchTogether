@@ -10,6 +10,8 @@ import {
   useState,
 } from "react";
 
+import { toast } from "sonner";
+
 import { createClient } from "@/lib/supabase/client";
 import { useRoom, type PlaybackBroadcast } from "@/components/room/room-provider";
 import type { QueueItem } from "@/types/database";
@@ -27,6 +29,7 @@ type PlaybackContextValue = {
   startCountdown: () => void;
   registerPlayer: (player: YT.Player) => void;
   handleStateChange: (state: number) => void;
+  handlePlayerError: () => void;
 };
 
 const PlaybackContext = createContext<PlaybackContextValue | null>(null);
@@ -238,6 +241,16 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     [isHost, persist, emitState, next],
   );
 
+  // A video failed to load (private / removed / embedding disabled / region-blocked).
+  const handlePlayerError = useCallback(() => {
+    toast.error("Couldn't play this video", {
+      description: hasNext
+        ? "It may be private, removed, or not embeddable — skipping to the next one."
+        : "It may be private, removed, or not embeddable.",
+    });
+    if (isHost) next();
+  }, [isHost, hasNext, next]);
+
   // Register a single realtime handler (host responds to requests; viewer follows).
   const emitRef = useRef(emitState);
   const applyRef = useRef(applyState);
@@ -282,6 +295,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     startCountdown,
     registerPlayer,
     handleStateChange,
+    handlePlayerError,
   };
 
   return <PlaybackContext.Provider value={value}>{children}</PlaybackContext.Provider>;

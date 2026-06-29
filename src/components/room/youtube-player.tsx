@@ -10,12 +10,13 @@ import { usePlayback } from "@/components/room/playback-provider";
  * are read from refs so queue/state changes never tear down the player.
  */
 export function YouTubePlayer() {
-  const { registerPlayer, handleStateChange, canControl } = usePlayback();
+  const { registerPlayer, handleStateChange, handlePlayerError, canControl } = usePlayback();
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YT.Player | null>(null);
 
   const registerRef = useRef(registerPlayer);
   const stateRef = useRef(handleStateChange);
+  const errorRef = useRef(handlePlayerError);
   // Host gets native controls; viewers get a controls-free, follow-only player.
   const canControlRef = useRef(canControl);
 
@@ -23,6 +24,7 @@ export function YouTubePlayer() {
   useEffect(() => {
     registerRef.current = registerPlayer;
     stateRef.current = handleStateChange;
+    errorRef.current = handlePlayerError;
   });
 
   useEffect(() => {
@@ -46,6 +48,7 @@ export function YouTubePlayer() {
         events: {
           onReady: (e) => registerRef.current(e.target),
           onStateChange: (e) => stateRef.current(e.data),
+          onError: () => errorRef.current(),
         },
       });
     });

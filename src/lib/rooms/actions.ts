@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
-import { ensureMembership } from "@/lib/rooms/membership";
+import { claimRoomHost, ensureMembership } from "@/lib/rooms/membership";
 import { generateRoomCode, normalizeRoomCode } from "@/lib/rooms/codes";
 
 export type RoomActionState = { error?: string };
@@ -78,7 +78,22 @@ export async function joinRoom(
   return joinByCode(code);
 }
 
-/** One-click join of the seeded demo room. */
+/** One-click join of the seeded demo room — the joiner becomes host so the demo
+ *  is controllable (its seeded host is never online). */
 export async function joinDemoRoom() {
-  await joinByCode("DEMO01");
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { data: room } = await supabase
+    .from("rooms")
+    .select("id, code, host_id")
+    .eq("code", "DEMO01")
+    .maybeSingle();
+  if (!room) return;
+
+  await claimRoomHost(room.id, user.id, room.host_id);
+  redirect(`/room/${room.code}`);
 }
