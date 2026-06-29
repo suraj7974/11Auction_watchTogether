@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { SendHorizontal } from "lucide-react";
 
 import { useRoom } from "@/components/room/room-provider";
+import { ReactionBar } from "@/components/room/reactions-overlay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -76,7 +77,9 @@ export function ChatPanel() {
         <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t p-3">
+      <ReactionBar />
+
+      <form onSubmit={handleSubmit} className="flex items-center gap-2 p-3">
         <Input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

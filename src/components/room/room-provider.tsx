@@ -42,6 +42,11 @@ type RoomContextValue = {
   broadcastPlayback: (state: PlaybackBroadcast) => void;
   requestSync: () => void;
   onPlaybackMessage: (handler: PlaybackHandler) => () => void;
+  // Generic broadcast (reactions, countdown):
+  broadcast: (event: string, payload: unknown) => void;
+  onBroadcast: (event: string, handler: (payload: unknown) => void) => () => void;
+  // Emoji reactions (broadcast to others + show locally):
+  sendReaction: (emoji: string) => void;
 };
 
 const RoomContext = createContext<RoomContextValue | null>(null);
@@ -78,6 +83,7 @@ export function RoomProvider({
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const playbackHandlers = useRef<Set<PlaybackHandler>>(new Set());
+  const broadcastHandlers = useRef<Map<string, Set<(payload: unknown) => void>>>(new Map());
 
   // --- realtime channel: presence + broadcast (chat, queue, playback) ---------
   useEffect(() => {
@@ -136,6 +142,12 @@ export function RoomProvider({
       })
       .on("broadcast", { event: "req" }, () => {
         playbackHandlers.current.forEach((h) => h({ request: true }));
+      })
+      .on("broadcast", { event: "reaction" }, ({ payload }) => {
+        broadcastHandlers.current.get("reaction")?.forEach((h) => h(payload));
+      })
+      .on("broadcast", { event: "countdown" }, ({ payload }) => {
+        broadcastHandlers.current.get("countdown")?.forEach((h) => h(payload));
       })
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
@@ -278,6 +290,26 @@ export function RoomProvider({
     };
   }, []);
 
+  const broadcast = useCallback((event: string, payload: unknown) => {
+    void channelRef.current?.send({ type: "broadcast", event, payload });
+  }, []);
+
+  const onBroadcast = useCallback((event: string, handler: (payload: unknown) => void) => {
+    const set = broadcastHandlers.current.get(event) ?? new Set();
+    set.add(handler);
+    broadcastHandlers.current.set(event, set);
+    return () => set.delete(handler);
+  }, []);
+
+  // Broadcast a reaction to others and dispatch it locally so the sender sees it too.
+  const sendReaction = useCallback(
+    (emoji: string) => {
+      broadcast("reaction", { emoji });
+      broadcastHandlers.current.get("reaction")?.forEach((h) => h({ emoji }));
+    },
+    [broadcast],
+  );
+
   const value: RoomContextValue = {
     room,
     currentUser,
@@ -291,6 +323,9 @@ export function RoomProvider({
     broadcastPlayback,
     requestSync,
     onPlaybackMessage,
+    broadcast,
+    onBroadcast,
+    sendReaction,
   };
 
   return <RoomContext.Provider value={value}>{children}</RoomContext.Provider>;

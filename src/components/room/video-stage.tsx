@@ -2,6 +2,8 @@
 
 import { usePlayback } from "@/components/room/playback-provider";
 import { YouTubePlayer } from "@/components/room/youtube-player";
+import { ReactionsFloaters } from "@/components/room/reactions-overlay";
+import { CountdownOverlay } from "@/components/room/countdown-overlay";
 
 export function VideoStage() {
   const { currentItem, canControl } = usePlayback();
@@ -13,7 +15,7 @@ export function VideoStage() {
         <YouTubePlayer />
 
         {!currentItem && (
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 text-center text-white/80">
+          <div className="pointer-events-none absolute inset-0 z-[5] flex flex-col items-center justify-center gap-2 bg-black/80 text-center text-white/80">
             <span className="text-4xl">🎬</span>
             <p className="text-sm font-medium">No video playing</p>
             <p className="max-w-xs text-xs text-white/60">
@@ -23,6 +25,19 @@ export function VideoStage() {
             </p>
           </div>
         )}
+
+        {/* Host-only control lock: block viewers from touching the player so they
+            can't desync. Playback follows the host automatically. */}
+        {!canControl && currentItem && (
+          <div
+            className="absolute inset-0 z-10"
+            title="The host controls playback"
+            aria-hidden
+          />
+        )}
+
+        <ReactionsFloaters />
+        <CountdownOverlay />
       </div>
 
       <div className="min-h-7">

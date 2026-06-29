@@ -23,6 +23,8 @@ type PlaybackContextValue = {
   playItem: (itemId: string) => void;
   next: () => void;
   hasNext: boolean;
+  countdownEndsAt: number | null;
+  startCountdown: () => void;
   registerPlayer: (player: YT.Player) => void;
   handleStateChange: (state: number) => void;
 };
@@ -39,8 +41,11 @@ const DRIFT_TOLERANCE = 1.5; // seconds before a viewer re-seeks
 const HEARTBEAT_MS = 2500;
 
 export function PlaybackProvider({ children }: { children: React.ReactNode }) {
-  const { room, queue, isHost, broadcastPlayback, requestSync, onPlaybackMessage } = useRoom();
+  const { room, queue, isHost, broadcastPlayback, requestSync, onPlaybackMessage, broadcast, onBroadcast } =
+    useRoom();
   const supabase = useMemo(() => createClient(), []);
+
+  const [countdownEndsAt, setCountdownEndsAt] = useState<number | null>(null);
 
   const playerRef = useRef<YT.Player | null>(null);
   const loadedVideoRef = useRef<string | null>(null);
@@ -174,6 +179,41 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentIndex, queue, playItem, persist, emitState]);
 
+  // Synchronized "starting in 3-2-1" countdown. Host triggers; everyone sees it;
+  // host starts playback at zero (which then syncs via the playback broadcast).
+  const startCountdown = useCallback(() => {
+    if (!isHost) return;
+    const duration = 3200;
+    const endsAt = Date.now() + duration;
+    setCountdownEndsAt(endsAt);
+    broadcast("countdown", { endsAt });
+    setTimeout(() => {
+      const player = playerRef.current;
+      if (currentItemIdRef.current && player) {
+        player.playVideo();
+      } else {
+        const first = queue.find((q) => !q.id.startsWith("temp-"));
+        if (first) playItem(first.id);
+      }
+    }, duration);
+  }, [isHost, broadcast, queue, playItem]);
+
+  // Viewers receive the countdown; clear it shortly after it ends.
+  useEffect(() => {
+    return onBroadcast("countdown", (payload) => {
+      setCountdownEndsAt((payload as { endsAt: number }).endsAt);
+    });
+  }, [onBroadcast]);
+
+  useEffect(() => {
+    if (countdownEndsAt == null) return;
+    const t = setTimeout(
+      () => setCountdownEndsAt(null),
+      Math.max(0, countdownEndsAt - Date.now()) + 700,
+    );
+    return () => clearTimeout(t);
+  }, [countdownEndsAt]);
+
   const handleStateChange = useCallback(
     (state: number) => {
       const player = playerRef.current;
@@ -236,6 +276,8 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     playItem,
     next,
     hasNext,
+    countdownEndsAt,
+    startCountdown,
     registerPlayer,
     handleStateChange,
   };

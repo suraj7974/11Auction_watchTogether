@@ -1,19 +1,29 @@
 "use client";
 
-import { Pause, Play, SkipForward } from "lucide-react";
+import { Pause, Play, SkipForward, Timer } from "lucide-react";
 
 import { usePlayback } from "@/components/room/playback-provider";
 import { useRoom } from "@/components/room/room-provider";
 import { Button } from "@/components/ui/button";
 
 export function HostControls() {
-  const { canControl, isPlaying, currentItem, playerReady, togglePlay, playItem, next, hasNext } =
-    usePlayback();
+  const {
+    canControl,
+    isPlaying,
+    currentItem,
+    playerReady,
+    togglePlay,
+    playItem,
+    next,
+    hasNext,
+    startCountdown,
+  } = usePlayback();
   const { queue } = useRoom();
 
   if (!canControl) return null;
 
   const firstPlayable = queue.find((q) => !q.id.startsWith("temp-"));
+  const hasPlayable = Boolean(currentItem ?? firstPlayable);
 
   return (
     <div className="mt-4 flex items-center gap-2 rounded-xl border bg-card p-3">
@@ -34,6 +44,16 @@ export function HostControls() {
 
       <Button size="sm" variant="outline" onClick={next} disabled={!hasNext}>
         <SkipForward className="size-4" /> Next
+      </Button>
+
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={startCountdown}
+        disabled={!hasPlayable || !playerReady}
+        title="Count everyone in: 3 · 2 · 1 · Go!"
+      >
+        <Timer className="size-4" /> Countdown
       </Button>
 
       <span className="ml-auto text-xs text-muted-foreground">

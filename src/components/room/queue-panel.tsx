@@ -6,6 +6,7 @@ import { Plus, Play, X } from "lucide-react";
 import { useRoom } from "@/components/room/room-provider";
 import { usePlayback } from "@/components/room/playback-provider";
 import { youTubeThumbnail } from "@/lib/youtube";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 export function QueuePanel() {
   const { queue, isHost, currentUser, addToQueue, removeFromQueue } = useRoom();
   const { currentItem, playItem } = usePlayback();
+
+  const currentIndex = currentItem ? queue.findIndex((q) => q.id === currentItem.id) : -1;
   const [url, setUrl] = useState("");
   const [adding, setAdding] = useState(false);
 
@@ -48,14 +51,18 @@ export function QueuePanel() {
           </div>
         ) : (
           <ul className="flex flex-col gap-1">
-            {queue.map((item) => {
+            {queue.map((item, index) => {
               const isCurrent = currentItem?.id === item.id;
+              const watched = currentIndex >= 0 && index < currentIndex;
               const canRemove = isHost || item.added_by === currentUser.id;
               const canPlay = isHost && !isCurrent && !item.id.startsWith("temp-");
               return (
                 <li
                   key={item.id}
-                  className="group flex items-center gap-3 rounded-md p-1.5 hover:bg-muted"
+                  className={cn(
+                    "group flex items-center gap-3 rounded-md p-1.5 hover:bg-muted",
+                    watched && "opacity-50",
+                  )}
                 >
                   <div className="relative shrink-0">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
