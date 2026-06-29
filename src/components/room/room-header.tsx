@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, Check, Copy, Users } from "lucide-react";
+import { ArrowLeft, Check, Clapperboard, Copy, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { useRoom } from "@/components/room/room-provider";
@@ -43,7 +43,7 @@ export function RoomHeader({ siteUrl }: { siteUrl: string }) {
           <ArrowLeft className="size-4" />
         </Link>
         <div className="flex items-center gap-2">
-          <span className="text-lg">🎬</span>
+          <Clapperboard className="size-5 text-primary" />
           <h1 className="font-semibold tracking-tight">{room.name}</h1>
         </div>
         <Badge variant="outline" className="font-mono tracking-widest">

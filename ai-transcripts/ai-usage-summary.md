@@ -11,16 +11,10 @@ checkpoint:
 
 ```
 ai-transcripts/
-  claude-session-1.txt   # planning + project scaffold
-  claude-session-2.txt   # Supabase schema, RLS, seed
-  claude-session-3.txt   # auth + profiles
-  claude-session-4.txt   # landing + dashboard
-  claude-session-5.txt   # room shell UI
-  claude-session-6.txt   # YouTube player + host controls
-  claude-session-7.txt   # RLS join fix + realtime sync engine
-  claude-session-8.txt   # extras (host lock, reactions, countdown)
-  claude-session-9.txt   # polish
-  ...                    # docs + deploy
+  2026-06-28-184005-project-start.txt
+  2026-06-28-195519-auth-dashboard-landing.txt
+  2026-06-28-212436-queue-realtime-sync.txt
+  2026-06-29-141654-emoji-docs.txt
 ```
 
 (Some sessions are combined; filenames reflect the main work in each.)

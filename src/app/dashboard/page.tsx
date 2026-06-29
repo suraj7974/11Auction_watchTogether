@@ -30,7 +30,7 @@ export default async function DashboardPage() {
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         <div className="mb-8 flex flex-col gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">
-            Hey {profile.display_name} 👋
+            Hey {profile.display_name}
           </h1>
           <p className="text-muted-foreground">
             Create a room and drop a YouTube link, or join a friend with a code.
@@ -83,7 +83,7 @@ export default async function DashboardPage() {
 
           {rooms.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed py-14 text-center">
-              <p className="text-3xl">🍿</p>
+              <Clapperboard className="size-8 text-muted-foreground" />
               <p className="font-medium">No rooms yet</p>
               <p className="max-w-sm text-sm text-muted-foreground">
                 Create your first room above, or join the demo to see how a watch party works.

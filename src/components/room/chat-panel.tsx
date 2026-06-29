@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { SendHorizontal } from "lucide-react";
+import { MessageSquare, SendHorizontal } from "lucide-react";
 
 import { useRoom } from "@/components/room/room-provider";
 import { ReactionBar } from "@/components/room/reactions-overlay";
@@ -38,7 +38,7 @@ export function ChatPanel() {
       <div className="flex-1 overflow-y-auto px-3 py-3">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-1 text-center text-sm text-muted-foreground">
-            <span className="text-2xl">💬</span>
+            <MessageSquare className="size-8" />
             <p>No messages yet</p>
             <p className="text-xs">Say hi while you wait for the video to start.</p>
           </div>

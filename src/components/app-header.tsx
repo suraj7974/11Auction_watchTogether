@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Clapperboard } from "lucide-react";
 
 import { signOut } from "@/lib/auth/actions";
 import type { Profile } from "@/types/database";
@@ -11,7 +12,7 @@ export function AppHeader({ profile }: { profile: Profile }) {
     <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4">
         <Link href="/dashboard" className="flex items-center gap-2 font-semibold tracking-tight">
-          <span className="text-xl">🎬</span>
+          <Clapperboard className="size-5 text-primary" />
           <span>Watch Together</span>
         </Link>
 

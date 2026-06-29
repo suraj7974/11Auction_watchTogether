@@ -1,0 +1,1470 @@
+⏺ Continuing to Checkpoint 8: Extras — host-only control lock, emoji reactions,
+  synchronized countdown, and queue auto-advance polish.
+
+⏺ First, adding a generic broadcast/subscribe to RoomProvider (for reactions +
+  countdown):
+
+⏺ Update(src/components/room/room-provider.tsx)
+  ⎿  Added 3 lines
+      42    broadcastPlayback: (state: PlaybackBroadcast) => void;
+      43    requestSync: () => void;
+      44    onPlaybackMessage: (handler: PlaybackHandler) => () => void;
+      45 +  // Generic broadcast (reactions, countdown):
+      46 +  broadcast: (event: string, payload: unknown) => void;
+      47 +  onBroadcast: (event: string, handler: (payload: unknown) => v
+         +oid) => () => void;
+      48  };
+      49
+      50  const RoomContext = createContext<RoomContextValue | null>(null
+          );
+
+⏺ Update(src/components/room/room-provider.tsx)
+  ⎿  Added 1 line
+      81
+      82    const channelRef = useRef<RealtimeChannel | null>(null);
+      83    const playbackHandlers = useRef<Set<PlaybackHandler>>(new Set
+          ());
+      84 +  const broadcastHandlers = useRef<Map<string, Set<(payload: un
+         +known) => void>>>(new Map());
+      85
+      86    // --- realtime channel: presence + broadcast (chat, queue, p
+          layback) ---------
+      87    useEffect(() => {
+
+⏺ Update(src/components/room/room-provider.tsx)
+  ⎿  Added 6 lines
+      141        .on("broadcast", { event: "req" }, () => {
+      142          playbackHandlers.current.forEach((h) => h({ request: t
+           rue }));
+      143        })
+      144 +      .on("broadcast", { event: "reaction" }, ({ payload }) =>
+          + {
+      145 +        broadcastHandlers.current.get("reaction")?.forEach((h)
+          + => h(payload));
+      146 +      })
+      147 +      .on("broadcast", { event: "countdown" }, ({ payload }) =
+          +> {
+      148 +        broadcastHandlers.current.get("countdown")?.forEach((h
+          +) => h(payload));
+      149 +      })
+      150        .subscribe((status) => {
+      151          if (status === "SUBSCRIBED") {
+      152            void channel.track({
+
+⏺ Update(src/components/room/room-provider.tsx)
+  ⎿  Added 11 lines
+      288      };
+      289    }, []);
+      290
+      291 +  const broadcast = useCallback((event: string, payload: unkno
+          +wn) => {
+      292 +    void channelRef.current?.send({ type: "broadcast", event,
+          +payload });
+      293 +  }, []);
+      294 +
+      295 +  const onBroadcast = useCallback((event: string, handler: (pa
+          +yload: unknown) => void) => {
+      296 +    const set = broadcastHandlers.current.get(event) ?? new Se
+          +t();
+      297 +    set.add(handler);
+      298 +    broadcastHandlers.current.set(event, set);
+      299 +    return () => set.delete(handler);
+      300 +  }, []);
+      301 +
+      302    const value: RoomContextValue = {
+      303      room,
+      304      currentUser,
+
+⏺ Update(src/components/room/room-provider.tsx)
+  ⎿  Added 2 lines
+      312      broadcastPlayback,
+      313      requestSync,
+      314      onPlaybackMessage,
+      315 +    broadcast,
+      316 +    onBroadcast,
+      317    };
+      318
+      319    return <RoomContext.Provider value={value}>{children}</RoomC
+           ontext.Provider>;
+
+⏺ Now the host-only lock — viewers get a controls-free player; update the player
+  and add a click-blocking overlay for viewers:
+
+⏺ Update(src/components/room/youtube-player.tsx)
+  ⎿  Added 3 lines, removed 1 line
+      10   * are read from refs so queue/state changes never tear down th
+          e player.
+      11   */
+      12  export function YouTubePlayer() {
+      13 -  const { registerPlayer, handleStateChange } = usePlayback();
+      13 +  const { registerPlayer, handleStateChange, canControl } = use
+         +Playback();
+      14    const containerRef = useRef<HTMLDivElement>(null);
+      15    const playerRef = useRef<YT.Player | null>(null);
+      16
+     ...
+      18    registerRef.current = registerPlayer;
+      19    const stateRef = useRef(handleStateChange);
+      20    stateRef.current = handleStateChange;
+      21 +  // Host gets native controls; viewers get a controls-free, fo
+         +llow-only player.
+      22 +  const canControlRef = useRef(canControl);
+      23
+      24    useEffect(() => {
+      25      let cancelled = false;
+
+⏺ Update(src/components/room/youtube-player.tsx)
+  ⎿  Added 2 lines, removed 1 line
+      31          height: "100%",
+      32          playerVars: {
+      33            autoplay: 0,
+      34 -          controls: 1,
+      34 +          controls: canControlRef.current ? 1 : 0,
+      35 +          disablekb: canControlRef.current ? 0 : 1,
+      36            modestbranding: 1,
+      37            rel: 0,
+      38            playsinline: 1,
+
+⏺ Now adding the synchronized countdown to PlaybackProvider (host triggers,
+  everyone counts down, host plays at zero):
+
+⏺ Update(src/components/room/playback-provider.tsx)
+  ⎿  Added 2 lines
+      23    playItem: (itemId: string) => void;
+      24    next: () => void;
+      25    hasNext: boolean;
+      26 +  countdownEndsAt: number | null;
+      27 +  startCountdown: () => void;
+      28    registerPlayer: (player: YT.Player) => void;
+      29    handleStateChange: (state: number) => void;
+      30  };
+
+⏺ Update(src/components/room/playback-provider.tsx)
+  ⎿  Added 4 lines, removed 1 line
+      41  const HEARTBEAT_MS = 2500;
+      42
+      43  export function PlaybackProvider({ children }: { children: Reac
+          t.ReactNode }) {
+      44 -  const { room, queue, isHost, broadcastPlayback, requestSync,
+         -onPlaybackMessage } = useRoom();
+      44 +  const { room, queue, isHost, broadcastPlayback, requestSync,
+         +onPlaybackMessage, broadcast, onBroadcast } =
+      45 +    useRoom();
+      46    const supabase = useMemo(() => createClient(), []);
+      47
+      48 +  const [countdownEndsAt, setCountdownEndsAt] = useState<number
+         + | null>(null);
+      49 +
+      50    const playerRef = useRef<YT.Player | null>(null);
+      51    const loadedVideoRef = useRef<string | null>(null);
+      52    const currentItemIdRef = useRef<string | null>(room.current_i
+          tem_id);
+
+⏺ Update(src/components/room/playback-provider.tsx)
+  ⎿  Added 35 lines
+      179      }
+      180    }, [currentIndex, queue, playItem, persist, emitState]);
+      181
+      182 +  // Synchronized "starting in 3-2-1" countdown. Host triggers
+          +; everyone sees it;
+      183 +  // host starts playback at zero (which then syncs via the pl
+          +ayback broadcast).
+      184 +  const startCountdown = useCallback(() => {
+      185 +    if (!isHost) return;
+      186 +    const duration = 3200;
+      187 +    const endsAt = Date.now() + duration;
+      188 +    setCountdownEndsAt(endsAt);
+      189 +    broadcast("countdown", { endsAt });
+      190 +    setTimeout(() => {
+      191 +      const player = playerRef.current;
+      192 +      if (currentItemIdRef.current && player) {
+      193 +        player.playVideo();
+      194 +      } else {
+      195 +        const first = queue.find((q) => !q.id.startsWith("temp
+          +-"));
+      196 +        if (first) playItem(first.id);
+      197 +      }
+      198 +    }, duration);
+      199 +  }, [isHost, broadcast, queue, playItem]);
+      200 +
+      201 +  // Viewers receive the countdown; clear it shortly after it
+          +ends.
+      202 +  useEffect(() => {
+      203 +    return onBroadcast("countdown", (payload) => {
+      204 +      setCountdownEndsAt((payload as { endsAt: number }).endsA
+          +t);
+      205 +    });
+      206 +  }, [onBroadcast]);
+      207 +
+      208 +  useEffect(() => {
+      209 +    if (countdownEndsAt == null) return;
+      210 +    const t = setTimeout(
+      211 +      () => setCountdownEndsAt(null),
+      212 +      Math.max(0, countdownEndsAt - Date.now()) + 700,
+      213 +    );
+      214 +    return () => clearTimeout(t);
+      215 +  }, [countdownEndsAt]);
+      216 +
+      217    const handleStateChange = useCallback(
+      218      (state: number) => {
+      219        const player = playerRef.current;
+
+⏺ Update(src/components/room/playback-provider.tsx)
+  ⎿  Added 2 lines
+      276      playItem,
+      277      next,
+      278      hasNext,
+      279 +    countdownEndsAt,
+      280 +    startCountdown,
+      281      registerPlayer,
+      282      handleStateChange,
+      283    };
+
+⏺ Now the reactions + countdown overlay components and CSS animations. Let me
+  check globals.css to add keyframes:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/app/globals.css)
+  ⎿  Added 37 lines
+      127    html {
+      128      @apply font-sans;
+      129    }
+      130 +}
+      131 +
+      132 +/* Floating emoji reactions */
+      133 +@keyframes float-up {
+      134 +  0% {
+      135 +    transform: translateY(0) scale(0.8);
+      136 +    opacity: 0;
+      137 +  }
+      138 +  15% {
+      139 +    opacity: 1;
+      140 +  }
+      141 +  100% {
+      142 +    transform: translateY(-180px) scale(1.5);
+      143 +    opacity: 0;
+      144 +  }
+      145 +}
+      146 +.animate-float-up {
+      147 +  animation: float-up 2.8s ease-out forwards;
+      148 +}
+      149 +
+      150 +/* Start countdown pop */
+      151 +@keyframes countdown-pop {
+      152 +  0% {
+      153 +    transform: scale(0.4);
+      154 +    opacity: 0;
+      155 +  }
+      156 +  40% {
+      157 +    transform: scale(1.1);
+      158 +    opacity: 1;
+      159 +  }
+      160 +  100% {
+      161 +    transform: scale(1);
+      162 +    opacity: 0.9;
+      163 +  }
+      164 +}
+      165 +.animate-countdown-pop {
+      166 +  animation: countdown-pop 0.45s ease-out;
+      167  }
+      168   No newline at end of file
+
+⏺ Write(src/components/room/reactions-overlay.tsx)  ⎿  Wrote 66 lines to src/components/room/reactions-overlay.tsx
+      1 "use client";
+      2
+      3 import { useEffect, useRef, useState } from "react";
+      4
+      5 import { useRoom } from "@/components/room/room-provider";
+      6
+      7 const EMOJIS = ["❤️", "😂", "🔥", "👏", "😮", "🎉"];
+      8
+      9 type Floater = { id: string; emoji: string; left: number };
+     … +64 lines (ctrl+o to expand)
+
+⏺ Write(src/components/room/countdown-overlay.tsx)
+  ⎿  Wrote 32 lines to src/components/room/countdown-overlay.tsx
+       2 "use client";
+       3 import { useEffect, useState } from "react";
+       4
+       5 import { usePlayback } from "@/components/room/playback-provider
+         ";
+       7 /** Full-screen "3 · 2 · 1 · Go!" overlay synced across the room
+         . */
+       8 export function CountdownOverlay() {
+       9   const { countdownEndsAt } = usePlayback();
+      10   const [now, setNow] = useState(() => Date.now());
+     … +25 lines (ctrl+o to expand)
+
+⏺ Now updating VideoStage to layer in the viewer lock, reactions, and countdown:
+
+⏺ Write(src/components/room/video-stage.tsx)
+  ⎿  Added 16 lines, removed 1 line
+      2
+      3  import { usePlayback } from "@/components/room/playback-provider
+         ";
+      4  import { YouTubePlayer } from "@/components/room/youtube-player"
+         ;
+      5 +import { ReactionsOverlay } from "@/components/room/reactions-ov
+        +erlay";
+      6 +import { CountdownOverlay } from "@/components/room/countdown-ov
+        +erlay";
+      7
+      8  export function VideoStage() {
+      9    const { currentItem, canControl } = usePlayback();
+     ...
+      15          <YouTubePlayer />
+      16
+      17          {!currentItem && (
+      16 -          <div className="pointer-events-none absolute inset-0
+         -flex flex-col items-center justify-center gap-2 bg-black/80 tex
+         -t-center text-white/80">
+      18 +          <div className="pointer-events-none absolute inset-0
+         +z-[5] flex flex-col items-center justify-center gap-2 bg-black/
+         +80 text-center text-white/80">
+      19              <span className="text-4xl">🎬</span>
+      20              <p className="text-sm font-medium">No video playing
+          </p>
+      21              <p className="max-w-xs text-xs text-white/60">
+     ...
+      25              </p>
+      26            </div>
+      27          )}
+      28 +
+      29 +        {/* Host-only control lock: block viewers from touching
+         + the player so they
+      30 +            can't desync. Playback follows the host automatical
+         +ly. */}
+      31 +        {!canControl && currentItem && (
+      32 +          <div
+      33 +            className="absolute inset-0 z-10"
+      34 +            title="The host controls playback"
+      35 +            aria-hidden
+      36 +          />
+      37 +        )}
+      38 +
+      39 +        <ReactionsOverlay />
+      40 +        <CountdownOverlay />
+      41        </div>
+      42
+      43        <div className="min-h-7">
+
+⏺ Now adding the Start countdown button to the host controls:
+
+⏺ Update(src/components/room/host-controls.tsx)
+  ⎿  Added 13 lines, removed 3 lines
+       1  "use client";
+       2
+       3 -import { Pause, Play, SkipForward } from "lucide-react";
+       3 +import { Pause, Play, SkipForward, Timer } from "lucide-react";
+       4
+       5  import { usePlayback } from "@/components/room/playback-provide
+          r";
+       6  import { useRoom } from "@/components/room/room-provider";
+       7  import { Button } from "@/components/ui/button";
+       8
+       9  export function HostControls() {
+      10 -  const { canControl, isPlaying, currentItem, playerReady, togg
+         -lePlay, playItem, next, hasNext } =
+      11 -    usePlayback();
+      10 +  const {
+      11 +    canControl,
+      12 +    isPlaying,
+      13 +    currentItem,
+      14 +    playerReady,
+      15 +    togglePlay,
+      16 +    playItem,
+      17 +    next,
+      18 +    hasNext,
+      19 +    startCountdown,
+      20 +  } = usePlayback();
+      21    const { queue } = useRoom();
+      22
+      23    if (!canControl) return null;
+      24
+      25    const firstPlayable = queue.find((q) => !q.id.startsWith("tem
+          p-"));
+      26 +  const hasPlayable = Boolean(currentItem ?? firstPlayable);
+      27
+      28    return (
+      29      <div className="mt-4 flex items-center gap-2 rounded-xl bor
+          der bg-card p-3">
+
+⏺ Update(src/components/room/host-controls.tsx)
+  ⎿  Added 10 lines
+      46          <SkipForward className="size-4" /> Next
+      47        </Button>
+      48
+      49 +      <Button
+      50 +        size="sm"
+      51 +        variant="outline"
+      52 +        onClick={startCountdown}
+      53 +        disabled={!hasPlayable || !playerReady}
+      54 +        title="Count everyone in: 3 · 2 · 1 · Go!"
+      55 +      >
+      56 +        <Timer className="size-4" /> Countdown
+      57 +      </Button>
+      58 +
+      59        <span className="ml-auto text-xs text-muted-foreground">
+      60          You&apos;re the host — you control playback for the roo
+          m.
+      61        </span>
+
+⏺ Now a light queue polish — dim already-watched items. Updating the queue
+  panel:
+
+⏺ Update(src/components/room/queue-panel.tsx)
+  ⎿  Added 2 lines
+      13  export function QueuePanel() {
+      14    const { queue, isHost, currentUser, addToQueue, removeFromQue
+          ue } = useRoom();
+      15    const { currentItem, playItem } = usePlayback();
+      16 +
+      17 +  const currentIndex = currentItem ? queue.findIndex((q) => q.i
+         +d === currentItem.id) : -1;
+      18    const [url, setUrl] = useState("");
+      19    const [adding, setAdding] = useState(false);
+      20
+
+⏺ Update(src/components/room/queue-panel.tsx)
+  ⎿  Added 6 lines, removed 2 lines
+      50            </div>
+      51          ) : (
+      52            <ul className="flex flex-col gap-1">
+      53 -            {queue.map((item) => {
+      53 +            {queue.map((item, index) => {
+      54                const isCurrent = currentItem?.id === item.id;
+      55 +              const watched = currentIndex >= 0 && index < curr
+         +entIndex;
+      56                const canRemove = isHost || item.added_by === cur
+          rentUser.id;
+      57                const canPlay = isHost && !isCurrent && !item.id.
+          startsWith("temp-");
+      58                return (
+      59                  <li
+      60                    key={item.id}
+      60 -                  className="group flex items-center gap-3 roun
+         -ded-md p-1.5 hover:bg-muted"
+      61 +                  className={cn(
+      62 +                    "group flex items-center gap-3 rounded-md p
+         +-1.5 hover:bg-muted",
+      63 +                    watched && "opacity-50",
+      64 +                  )}
+      65                  >
+      66                    <div className="relative shrink-0">
+      67                      {/* eslint-disable-next-line @next/next/no-
+          img-element */}
+
+⏺ cn needs importing in queue-panel:
+
+⏺ Update(src/components/room/queue-panel.tsx)
+  ⎿  Added 1 line
+       6  import { useRoom } from "@/components/room/room-provider";
+       7  import { usePlayback } from "@/components/room/playback-provide
+          r";
+       8  import { youTubeThumbnail } from "@/lib/youtube";
+       9 +import { cn } from "@/lib/utils";
+      10  import { Button } from "@/components/ui/button";
+      11  import { Input } from "@/components/ui/input";
+      12  import { Badge } from "@/components/ui/badge";
+
+⏺ Now typecheck and build the extras:
+
+⏺ Bash(pnpm exec tsc --noEmit 2>&1 | head -20; echo "tsc exit:
+      ${PIPESTATUS[0]}")
+  ⎿  tsc exit:
+
+⏺ Bash(pnpm build 2>&1 | tail -8)
+  ⎿  └ ○ /signup
+     … +4 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ ✅ Checkpoint 8 complete — extras. Stopping for your commit.
+
+  What was built
+
+  - Host-only control lock — viewers get a controls-free player with a
+  click-blocking overlay, so they can't desync the room. Only the host controls
+  playback.
+  - Emoji reactions — a floating-emoji bar over the video; reactions animate up
+  and broadcast to everyone in realtime.
+  - Synchronized start countdown — host hits Countdown → everyone sees a 3 · 2 ·
+  1 · Go! overlay, and the host auto-plays at zero (which syncs to all via the
+  playback broadcast).
+  - Queue polish — already-watched items dim automatically as playback advances.
+  - Added a generic broadcast / onBroadcast layer on the room channel (powers
+  reactions + countdown).
+
+  Verified
+
+  - ✅ tsc clean + pnpm build passes
+  - ✅ Reactions/countdown ride the same broadcast transport already confirmed
+  working in CP7
+
+  🧪 Two-browser test (A = host, B = viewer; demo@ and friend@, pwd watchparty)
+
+  1. Reactions: click an emoji in A → it floats up in both windows.
+  2. Countdown: in A click Countdown → both see 3·2·1·Go, then the video starts
+  in sync.
+  3. Host-only lock: in B (viewer), try clicking the video / scrubbing → nothing
+  happens; B only follows A. In A you still have full controls.
+  4. Queue: advance past a video → earlier items dim as "watched".
+
+  👉 Your commit
+
+  git add -A
+  git commit -m "feat(extras): host-only lock, emoji reactions, and start
+  countdown
+
+  - Host-only playback: viewers get a locked, controls-free follow player
+  - Floating emoji reactions broadcast over the video
+  - Synchronized 3-2-1 start countdown; host auto-plays at zero
+  - Dim already-watched queue items
+  - Generic broadcast/onBroadcast channel layer for reactions + countdown"
+
+  📤 Reminder: /export → ai-transcripts/claude-session-8.txt
+
+  ---
+  Say "continue" for Checkpoint 9: Polish — global error/loading/empty-state
+  pass, reconnect handling, toasts, responsive desktop layout cleanup, and small
+  UX refinements before docs + deploy.
+
+✻ Cogitated for 6m 42s
+
+※ recap: Building a Watch Together Platform (Next.js + Supabase) in commit-checkpoints; Checkpoints 1-8 are done and verified. Next: commit Checkpoint 8 with the message I provided, then say "continue" to start Checkpoint 9 (polish). (disable recaps in /config)
+
+❯ the emoji's are in ther video bounding box, shift it to the chat section
+
+⏺ Good catch — the floating emojis should stay over the video, but the picker
+  buttons belong in the chat. Let me split them: keep the floaters over the
+  video, move the emoji bar into the chat panel. First, add a sendReaction that
+  broadcasts and shows your own reaction:
+
+⏺ Update(src/components/room/room-provider.tsx)
+  ⎿  Added 2 lines
+      45    // Generic broadcast (reactions, countdown):
+      46    broadcast: (event: string, payload: unknown) => void;
+      47    onBroadcast: (event: string, handler: (payload: unknown) => v
+          oid) => () => void;
+      48 +  // Emoji reactions (broadcast to others + show locally):
+      49 +  sendReaction: (emoji: string) => void;
+      50  };
+      51
+      52  const RoomContext = createContext<RoomContextValue | null>(null
+          );
+
+⏺ Update(src/components/room/room-provider.tsx)
+  ⎿  Added 9 lines
+      301      return () => set.delete(handler);
+      302    }, []);
+      303
+      304 +  // Broadcast a reaction to others and dispatch it locally so
+          + the sender sees it too.
+      305 +  const sendReaction = useCallback(
+      306 +    (emoji: string) => {
+      307 +      broadcast("reaction", { emoji });
+      308 +      broadcastHandlers.current.get("reaction")?.forEach((h) =
+          +> h({ emoji }));
+      309 +    },
+      310 +    [broadcast],
+      311 +  );
+      312 +
+      313    const value: RoomContextValue = {
+      314      room,
+      315      currentUser,
+
+⏺ Update(src/components/room/room-provider.tsx)  ⎿  Added 1 line
+      325      onPlaybackMessage,
+      326      broadcast,
+      327      onBroadcast,
+      328 +    sendReaction,
+      329    };
+      330
+      331    return <RoomContext.Provider value={value}>{children}</RoomC
+           ontext.Provider>;
+
+⏺ Now split the overlay into floaters-only (over video) and a separate reaction
+  bar (for chat):
+
+⏺ Write(src/components/room/reactions-overlay.tsx)
+  ⎿  Added 34 lines, removed 37 lines
+       4
+       5  import { useRoom } from "@/components/room/room-provider";
+       6
+       7 -const EMOJIS = ["❤️", "😂", "🔥", "👏", "😮", "🎉"];
+       7 +export const REACTION_EMOJIS = ["❤️", "😂", "🔥", "👏", "😮", "
+         +🎉"];
+       8
+       9  type Floater = { id: string; emoji: string; left: number };
+      10
+      11 -/** Floating emoji reactions over the video, plus the emoji pic
+         -ker bar. */
+      12 -export function ReactionsOverlay() {
+      13 -  const { broadcast, onBroadcast } = useRoom();
+      11 +/** Floating emoji reactions that rise over the video. */
+      12 +export function ReactionsFloaters() {
+      13 +  const { onBroadcast } = useRoom();
+      14    const [floaters, setFloaters] = useState<Floater[]>([]);
+      15
+      16    const spawn = (emoji: string) => {
+     ...
+      27      [onBroadcast],
+      28    );
+      29
+      30 -  const react = (emoji: string) => {
+      31 -    spawn(emoji);
+      32 -    broadcast("reaction", { emoji });
+      33 -  };
+      34 -
+      30    return (
+      36 -    <>
+      37 -      <div className="pointer-events-none absolute inset-0 z-20
+         - overflow-hidden">
+      38 -        {floaters.map((f) => (
+      39 -          <span
+      40 -            key={f.id}
+      41 -            className="animate-float-up absolute bottom-16 text
+         --3xl drop-shadow"
+      42 -            style={{ left: `${f.left}%` }}
+      43 -          >
+      44 -            {f.emoji}
+      45 -          </span>
+      46 -        ))}
+      47 -      </div>
+      31 +    <div className="pointer-events-none absolute inset-0 z-20 o
+         +verflow-hidden">
+      32 +      {floaters.map((f) => (
+      33 +        <span
+      34 +          key={f.id}
+      35 +          className="animate-float-up absolute bottom-8 text-3x
+         +l drop-shadow"
+      36 +          style={{ left: `${f.left}%` }}
+      37 +        >
+      38 +          {f.emoji}
+      39 +        </span>
+      40 +      ))}
+      41 +    </div>
+      42 +  );
+      43 +}
+      44
+      49 -      <div className="absolute bottom-12 left-1/2 z-20 -transla
+         -te-x-1/2">
+      50 -        <div className="flex gap-0.5 rounded-full bg-black/50 p
+         -x-2 py-1 backdrop-blur-sm">
+      51 -          {EMOJIS.map((e) => (
+      52 -            <button
+      53 -              key={e}
+      54 -              type="button"
+      55 -              onClick={() => react(e)}
+      56 -              aria-label={`React ${e}`}
+      57 -              className="rounded-full px-1.5 text-lg leading-no
+         -ne transition-transform hover:scale-125"
+      58 -            >
+      59 -              {e}
+      60 -            </button>
+      61 -          ))}
+      62 -        </div>
+      63 -      </div>
+      64 -    </>
+      45 +/** Emoji picker bar — lives in the chat panel. */
+      46 +export function ReactionBar() {
+      47 +  const { sendReaction } = useRoom();
+      48 +  return (
+      49 +    <div className="flex items-center justify-center gap-1 bord
+         +er-t px-3 py-2">
+      50 +      {REACTION_EMOJIS.map((e) => (
+      51 +        <button
+      52 +          key={e}
+      53 +          type="button"
+      54 +          onClick={() => sendReaction(e)}
+      55 +          aria-label={`React ${e}`}
+      56 +          className="rounded-full px-1.5 text-xl leading-none t
+         +ransition-transform hover:scale-125"
+      57 +        >
+      58 +          {e}
+      59 +        </button>
+      60 +      ))}
+      61 +    </div>
+      62    );
+      63  }
+
+⏺ Now update VideoStage to render only the floaters (not the bar):
+
+⏺ Update(src/components/room/video-stage.tsx)
+  ⎿  Added 1 line, removed 1 line
+      2
+      3  import { usePlayback } from "@/components/room/playback-provider
+         ";
+      4  import { YouTubePlayer } from "@/components/room/youtube-player"
+         ;
+      5 -import { ReactionsOverlay } from "@/components/room/reactions-ov
+        -erlay";
+      5 +import { ReactionsFloaters } from "@/components/room/reactions-o
+        +verlay";
+      6  import { CountdownOverlay } from "@/components/room/countdown-ov
+         erlay";
+      7
+      8  export function VideoStage() {
+
+⏺ Update(src/components/room/video-stage.tsx)
+  ⎿  Added 1 line, removed 1 line
+      36            />
+      37          )}
+      38
+      39 -        <ReactionsOverlay />
+      39 +        <ReactionsFloaters />
+      40          <CountdownOverlay />
+      41        </div>
+      42
+
+⏺ Now add the reaction bar to the chat panel (above the message input):
+
+⏺ Update(src/components/room/chat-panel.tsx)
+  ⎿  Added 1 line
+       4  import { SendHorizontal } from "lucide-react";
+       5
+       6  import { useRoom } from "@/components/room/room-provider";
+       7 +import { ReactionBar } from "@/components/room/reactions-overla
+         +y";
+       8  import { Button } from "@/components/ui/button";
+       9  import { Input } from "@/components/ui/input";
+      10  import { cn } from "@/lib/utils";
+
+⏺ Update(src/components/room/chat-panel.tsx)
+  ⎿  Added 3 lines, removed 1 line
+      77          <div ref={bottomRef} />
+      78        </div>
+      79
+      80 -      <form onSubmit={handleSubmit} className="flex items-cente
+         -r gap-2 border-t p-3">
+      80 +      <ReactionBar />
+      81 +
+      82 +      <form onSubmit={handleSubmit} className="flex items-cente
+         +r gap-2 p-3">
+      83          <Input
+      84            value={draft}
+      85            onChange={(e) => setDraft(e.target.value)}
+
+⏺ Let me typecheck and build:
+
+⏺ Bash(pnpm exec tsc --noEmit 2>&1 | head -15; echo "tsc exit:
+      ${PIPESTATUS[0]}"; echo "=== build ==="; pnpm build 2>&1 | tail -6)
+  ⎿  tsc exit:
+     === build ===
+     … +4 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ Done — the emoji picker bar now lives in the chat panel (just above the
+  message input), while the floating emojis still rise over the video. Reacting
+  from chat shows the float over everyone's video in realtime.
+
+  - ✅ tsc clean + pnpm build passes
+
+  Since this is part of the same Extras checkpoint, fold it into your CP8 commit
+  (or commit now):
+
+  git add -A
+  git commit -m "feat(extras): host-only lock, emoji reactions, and start
+  countdown
+
+  - Host-only playback: viewers get a locked, controls-free follow player
+  - Floating emoji reactions over the video; picker bar lives in the chat panel
+  - Synchronized 3-2-1 start countdown; host auto-plays at zero
+  - Dim already-watched queue items
+  - Generic broadcast/onBroadcast channel layer for reactions + countdown"
+
+  🧪 Quick check
+
+  In the room, the emoji buttons are now in the chat sidebar (above the input).
+  Click one → it floats up over the video for everyone.
+
+  📤 Reminder: /export → ai-transcripts/claude-session-8.txt
+
+  ---
+  Say "continue" for Checkpoint 9: Polish — global loading/empty/error-state
+  pass, realtime reconnect handling, toasts, and desktop layout refinements
+  before docs + deploy.
+
+✻ Baked for 1m 56s
+
+※ recap: We're building the Watch Together Platform (Option 4) in checkpoints; Checkpoint 8 (extras: host-lock, reactions, countdown) just finished and is ready to commit. Next: you commit, then say "continue" to start Checkpoint 9 (polish). (disable recaps in /config)
+
+❯ continue
+
+⏺ Continuing to Checkpoint 9: Polish — realtime connection status/reconnect
+  handling, dashboard loading state, and UX refinements.
+
+⏺ First, surfacing realtime connection status (with auto re-track/re-sync on
+  reconnect). Adding to RoomProvider:
+
+⏺ Update(src/components/room/room-provider.tsx)
+  ⎿  Added 1 line
+      35    messages: Message[];
+      36    queue: QueueItem[];
+      37    participants: ParticipantView[];
+      38 +  connection: "connecting" | "live" | "reconnecting";
+      39    sendMessage: (content: string) => Promise<void>;
+      40    addToQueue: (url: string) => Promise<boolean>;
+      41    removeFromQueue: (id: string) => Promise<void>;
+
+⏺ Update(src/components/room/room-provider.tsx)
+  ⎿  Added 1 line
+      81    const [messages, setMessages] = useState<Message[]>(bundle.me
+          ssages);
+      82    const [queue, setQueue] = useState<QueueItem[]>(bundle.queue)
+          ;
+      83    const [participants, setParticipants] = useState<ParticipantV
+          iew[]>(bundle.participants);
+      84 +  const [connection, setConnection] = useState<"connecting" | "
+         +live" | "reconnecting">("connecting");
+      85
+      86    const channelRef = useRef<RealtimeChannel | null>(null);
+      87    const playbackHandlers = useRef<Set<PlaybackHandler>>(new Set
+          ());
+
+⏺ Update(src/components/room/room-provider.tsx)
+  ⎿  Added 4 lines
+      153        })
+      154        .subscribe((status) => {
+      155          if (status === "SUBSCRIBED") {
+      156 +          setConnection("live");
+      157 +          // Runs again on every (re)subscribe, so reconnects
+          +re-track + re-sync.
+      158            void channel.track({
+      159              userId: currentUser.id,
+      160              displayName: currentUser.displayName,
+     ...
+      163            } satisfies PresenceMeta);
+      164            // Ask the host for the current playback state (late
+           -joiner sync).
+      165            void channel.send({ type: "broadcast", event: "req",
+            payload: {} });
+      166 +        } else if (status === "CHANNEL_ERROR" || status === "T
+          +IMED_OUT" || status === "CLOSED") {
+      167 +          setConnection("reconnecting");
+      168          }
+      169        });
+      170
+
+⏺ Update(src/components/room/room-provider.tsx)
+  ⎿  Added 1 line
+      323      messages,
+      324      queue,
+      325      participants,
+      326 +    connection,
+      327      sendMessage,
+      328      addToQueue,
+      329      removeFromQueue,
+
+⏺ Now show the connection status in the room header:
+
+⏺ Update(src/components/room/room-header.tsx)
+  ⎿  Added 8 lines, removed 1 line
+       9  import { Badge } from "@/components/ui/badge";
+      10  import { Button, buttonVariants } from "@/components/ui/button"
+          ;
+      11
+      12 +const CONNECTION_LABEL = {
+      13 +  connecting: { dot: "bg-amber-500", text: "Connecting…" },
+      14 +  live: { dot: "bg-emerald-500", text: "Live" },
+      15 +  reconnecting: { dot: "bg-amber-500 animate-pulse", text: "Rec
+         +onnecting…" },
+      16 +} as const;
+      17 +
+      18  export function RoomHeader({ siteUrl }: { siteUrl: string }) {
+      13 -  const { room, participants } = useRoom();
+      19 +  const { room, participants, connection } = useRoom();
+      20    const [copied, setCopied] = useState(false);
+      21 +  const status = CONNECTION_LABEL[connection];
+      22
+      23    async function copyInvite() {
+      24      const link = `${siteUrl}/room/${room.code}`;
+⏺ Update(src/components/room/room-header.tsx)
+  ⎿  Added 8 lines, removed 1 line
+      51          </Badge>
+      52        </div>
+      53
+      54 -      <div className="flex items-center gap-2">
+      54 +      <div className="flex items-center gap-3">
+      55 +        <span
+      56 +          className="flex items-center gap-1.5 text-xs text-mut
+         +ed-foreground"
+      57 +          title={`Realtime: ${status.text}`}
+      58 +        >
+      59 +          <span className={`size-2 rounded-full ${status.dot}`}
+         + />
+      60 +          {status.text}
+      61 +        </span>
+      62          <span className="flex items-center gap-1 text-sm text-m
+          uted-foreground">
+      63            <Users className="size-4" />
+      64            {participants.length}
+
+⏺ Now a loading skeleton for the dashboard:
+
+⏺ Write(src/app/dashboard/loading.tsx)
+  ⎿  Wrote 26 lines to src/app/dashboard/loading.tsx
+       2 import { Skeleton } from "@/components/ui/skeleton";
+       3 export default function DashboardLoading() {
+       4   return (
+       5     <>
+       6       <div className="flex h-14 items-center justify-between bor
+       7         <Skeleton className="h-6 w-40" />
+       8         <Skeleton className="h-8 w-28" />
+       9       </div>
+      10       <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-8"
+         >
+     … +18 lines (ctrl+o to expand)
+
+⏺ Bash(pnpm exec tsc --noEmit 2>&1 | head -15; echo "tsc exit:
+      ${PIPESTATUS[0]}"; echo "=== build ==="; pnpm build 2>&1 | tail -6)
+  ⎿  tsc exit:
+     === build ===
+     … +4 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ Build passes. Let me run the linter to catch any code-quality issues across
+  the project:
+
+⏺ Bash(pnpm lint 2>&1 | tail -30)
+  ⎿  /Users/suraj7974/Codebase/11Auction/src/components/room/youtube-player
+     .tsx
+       18:3  error  Error: Cannot access refs during render
+     … +26 lines (ctrl+o to expand)
+
+⏺ The new react-hooks/refs rule flags the "latest ref" pattern (writing refs
+  during render). Let me fix all occurrences by updating refs inside effects
+  instead. Starting with the player:
+
+⏺ Update(src/components/room/youtube-player.tsx)
+  ⎿  Added 6 lines, removed 2 lines
+      15    const playerRef = useRef<YT.Player | null>(null);
+      16
+      17    const registerRef = useRef(registerPlayer);
+      18 -  registerRef.current = registerPlayer;
+      18    const stateRef = useRef(handleStateChange);
+      20 -  stateRef.current = handleStateChange;
+      19    // Host gets native controls; viewers get a controls-free, fo
+          llow-only player.
+      20    const canControlRef = useRef(canControl);
+      21
+      22 +  // Keep the latest callbacks without re-creating the player.
+      23    useEffect(() => {
+      24 +    registerRef.current = registerPlayer;
+      25 +    stateRef.current = handleStateChange;
+      26 +  });
+      27 +
+      28 +  useEffect(() => {
+      29      let cancelled = false;
+      30
+      31      loadYouTubeIframeApi().then((api) => {
+
+⏺ Update(src/components/room/playback-provider.tsx)
+  ⎿  Added 4 lines, removed 2 lines
+      240
+      241    // Register a single realtime handler (host responds to requ
+           ests; viewer follows).
+      242    const emitRef = useRef(emitState);
+      243 -  emitRef.current = emitState;
+      243    const applyRef = useRef(applyState);
+      245 -  applyRef.current = applyState;
+      244 +  useEffect(() => {
+      245 +    emitRef.current = emitState;
+      246 +    applyRef.current = applyState;
+      247 +  });
+      248
+      249    useEffect(() => {
+      250      return onPlaybackMessage((msg) => {
+
+⏺ Update(src/components/room/reactions-overlay.tsx)
+  ⎿  Added 3 lines, removed 1 line
+      20      setTimeout(() => setFloaters((prev) => prev.filter((f) => f
+          .id !== id)), 2800);
+      21    };
+      22    const spawnRef = useRef(spawn);
+      23 -  spawnRef.current = spawn;
+      23 +  useEffect(() => {
+      24 +    spawnRef.current = spawn;
+      25 +  });
+      26
+      27    useEffect(
+      28      () => onBroadcast("reaction", (payload) => spawnRef.current
+          ((payload as { emoji: string }).emoji)),
+
+⏺ Bash(pnpm lint 2>&1 | tail -20; echo "lint exit: ${PIPESTATUS[0]}")
+  ⎿  > watch-together@0.1.0 lint /Users/suraj7974/Codebase/11Auction
+     > eslint
+
+     lint exit:
+
+⏺ Lint is clean. Let me confirm the build still passes after the ref→effect
+  changes:
+
+⏺ Bash(pnpm build 2>&1 | tail -8)
+  ⎿  └ ○ /signup
+     … +4 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+⏺ Build passes, lint is clean across the whole project.
+
+⏺ ✅ Checkpoint 9 complete — polish. Stopping for your commit.
+
+  What was done
+
+  - Realtime connection indicator — the room header now shows a live status dot:
+  Live (green), Connecting…, or Reconnecting… (amber, pulsing). Good signal of
+  realtime health for reviewers.
+  - Reconnect handling — on every (re)subscribe the client re-tracks presence
+  and re-requests playback sync, so a dropped connection self-heals (rejoins,
+  re-syncs position, restores the participant list).
+  - Dashboard loading skeleton (/dashboard/loading.tsx).
+  - Lint pass — fixed all ESLint errors (the new react-hooks/refs rule flagged
+  the "latest ref" pattern); refs now update inside effects. pnpm lint is clean
+  and pnpm build passes.
+
+  Verified
+
+  - ✅ tsc clean · ✅ pnpm lint clean · ✅ pnpm build passes
+
+  🧪 Quick check
+
+  In a room, the header shows a green ● Live dot. Kill your wifi briefly → it
+  flips to Reconnecting…, then back to Live and re-syncs when the connection
+  returns.
+
+  👉 Your commit
+
+  git add -A
+  git commit -m "polish: realtime connection status, reconnect re-sync, lint
+  clean
+
+  - Room header shows Live/Connecting/Reconnecting status
+  - Re-track presence and re-request sync on every (re)subscribe
+  - Dashboard loading skeleton
+  - Fix react-hooks/refs lint errors (update refs in effects)"
+
+  📤 Reminder: /export → ai-transcripts/claude-session-9.txt
+
+  ---
+  Say "continue" for Checkpoint 10: Documentation — the full README.md,
+  docs/PROJECT_DOCUMENTATION.md (technical), docs/OVERVIEW.md (plain-language
+  flow), and the ai-transcripts/ folder with ai-usage-summary.md. After that,
+  Checkpoint 11 is deployment.
+
+✻ Cooked for 3m 51s
+
+※ recap: Building the Watch Together Platform (Option 4) for the 11auction challenge; we've finished through Checkpoint 9 (polish), with the app fully functional. Next, commit Checkpoint 9, then continue to Checkpoint 10: writing the README and documentation. (disable recaps in /config)
+
+❯ continue
+
+⏺ Continuing to Checkpoint 10: Documentation. Writing the full README, technical
+  docs, plain-language overview, and the AI-usage summary.
+⏺ Write(README.md)
+  ⎿  Added 130 lines, removed 35 lines
+        1 -# Watch Together Platform
+        1 +# 🎬 Watch Together Platform
+        2
+        3 -A watch-party platform where one user creates a room, adds a Y
+          -ouTube link, invites friends, and
+        4 -everyone watches **in sync** — with realtime play/pause/seek,
+          -live chat, presence, reactions, a
+        5 -shared watch queue, and a synchronized start countdown.
+        3 +A watch-party web app where one person creates a room, drops i
+          +n a YouTube link, invites friends,
+        4 +and **everyone watches in perfect sync** — play / pause / seek
+          + stay aligned across browsers, with
+        5 +live chat, presence, emoji reactions, a shared queue, and a sy
+          +nchronized start countdown.
+        6
+        7 -> Built for the **11auction** assignment — Option 4: Watch Tog
+          -ether Platform.
+        7 +> Built for the **11auction** assignment — **Option 4: Watch T
+          +ogether Platform**.
+        8
+        9  ---
+       10
+       11  ## Live Demo
+       12
+       13 -_TBD — hosted Vercel URL will go here._
+       13 +- **App:** _<add your Vercel URL here after deploying>_
+       14 +- It is a **public demo**: use the seeded credentials below (n
+          +o email confirmation needed).
+       15
+       16  ## Demo Credentials
+       17
+       17 -_TBD — seeded demo account email/password + public demo room l
+          -ink._
+       18 +Two pre-seeded, ready-to-use accounts (open each in a **separa
+          +te browser/profile** to watch
+       19 +together):
+       20
+       21 +| Role | Email | Password |
+       22 +|------|-------|----------|
+       23 +| Host | `demo@watchtogether.app` | `watchparty` |
+       24 +| Friend | `friend@watchtogether.app` | `watchparty` |
+       25 +
+       26 +There's a seeded **demo room** (code `DEMO01`) with two queued
+          + videos. From the dashboard, click
+       27 +**Join demo**, or open `/room/DEMO01`. You can also click **Tr
+          +y the demo** on the login page to sign
+       28 +in as the host in one click.
+       29 +
+       30  ## Tech Stack
+       31
+       21 -- **Framework:** Next.js 16 (App Router) + React 19 + TypeScri
+          -pt
+       22 -- **Styling:** Tailwind CSS v4 + shadcn/ui
+       23 -- **Backend / DB / Auth:** Supabase (Postgres, Auth, Realtime)
+       24 -- **Realtime:** Supabase Realtime — broadcast (playback/reacti
+          -ons/countdown), presence
+       25 -  (participants), postgres_changes (persisted chat)
+       26 -- **Video:** YouTube IFrame Player API
+       27 -- **Hosting:** Vercel
+       32 +| Layer | Choice |
+       33 +|-------|--------|
+       34 +| Framework | **Next.js 16** (App Router) + **React 19** + **T
+          +ypeScript** |
+       35 +| Styling | **Tailwind CSS v4** + **shadcn/ui** (Base UI) + lu
+          +cide icons |
+       36 +| Auth / DB | **Supabase** — Postgres + Supabase Auth (email/p
+          +assword) |
+       37 +| Realtime | **Supabase Realtime** — presence + broadcast |
+       38 +| Video | **YouTube IFrame Player API** |
+       39 +| Hosting | **Vercel** |
+       40
+       41  ## Features
+       42
+       31 -**Core**
+       32 -- Create watch room · Join by link/code · Add YouTube URL · Sh
+          -ared player
+       33 -- Realtime play/pause/seek sync · Realtime chat · Participants
+          - list
+       34 -- Late-joiner sync · Room persistence
+       43 +**Core (all implemented)**
+       44 +- Create a watch room · Join by link/code · Add a YouTube URL
+       45 +- Shared player with **realtime play / pause / seek sync**
+       46 +- **Realtime chat** · **Participants list** · **Late-joiner sy
+          +nc** · Room persistence
+       47
+       48  **Extras**
+       37 -- Host-only controls · Emoji reactions · Watch queue · Start-a
+          -t-same-time countdown
+       49 +- 🔒 **Host-only controls** (viewers can't desync the room)
+       50 +- ❤️ **Emoji reactions** floating over the video
+       51 +- 📺 **Watch queue** with auto-advance
+       52 +- ⏱️ **Synchronized start countdown** (3 · 2 · 1 · Go!)
+       53 +- 🟢 **Presence** + live **connection status** indicator
+       54 +- 🔁 **Reconnect handling** (re-syncs on reconnect)
+       55
+       56  ## Architecture
+       57
+       41 -_TBD — see `docs/PROJECT_DOCUMENTATION.md`._
+       58 +```
+       59 +Browser (Next.js client)                Supabase
+          +         Vercel
+       60 + ├─ Landing / Auth / Dashboard  ─────▶  Auth (email/password)
+          +     ◀── hosts the Next.js app
+       61 + ├─ Room
+       62 + │   ├─ YouTube IFrame player           Postgres (schema: elev
+          +en_auction)
+       63 + │   ├─ Chat · Reactions                 rooms, queue_items, m
+          +essages,
+       64 + │   ├─ Participants (presence)          room_participants, pr
+          +ofiles  (RLS)
+       65 + │   └─ Host controls / countdown
+       66 + └─ Server Components +          ─────▶  Realtime channel  roo
+          +m:{id}
+       67 +    Server Actions + proxy.ts             • presence  → partic
+          +ipants
+       68 +                                          • broadcast → playba
+          +ck / chat / queue
+       69 +                                                        / reac
+          +tions / countdown
+       70 +```
+       71
+       72 +Separation of concerns:
+       73 +- `src/app/` — routes, server actions, and `proxy.ts` (auth) —
+          + the **backend** edges
+       74 +- `src/components/room/` — the room **frontend** (providers +
+          +panels)
+       75 +- `src/lib/supabase/` — DB/auth clients (browser, server, admi
+          +n)
+       76 +- `src/lib/rooms/`, `src/lib/youtube*` — domain logic
+       77 +- `supabase/migrations/` + `supabase/seed.ts` — **database**
+       78 +
+       79 +See **[`docs/PROJECT_DOCUMENTATION.md`](docs/PROJECT_DOCUMENTA
+          +TION.md)** for the deep dive and
+       80 +**[`docs/OVERVIEW.md`](docs/OVERVIEW.md)** for a plain-languag
+          +e walkthrough.
+       81 +
+       82  ## Realtime Design
+       83
+       45 -_TBD — host-authoritative sync model, drift correction, late-j
+          -oiner sync._
+       84 +**Host-authoritative** model — the host's player is the single
+          + source of truth, which is what
+       85 +prevents permanent desync.
+       86
+       87 +- One Supabase Realtime **channel per room** (`room:{roomId}`)
+          +.
+       88 +- **Playback:** the host broadcasts `{ videoId, positionSecond
+          +s, isPlaying, emittedAt }` on
+       89 +  play/pause/seek/track-change. Viewers apply it, accounting f
+          +or elapsed time.
+       90 +- **Drift correction:** the host emits a heartbeat every 2.5s;
+          + any viewer more than ~1.5s off
+       91 +  **re-seeks**. Viewers' players are also locked (host-only co
+          +ntrols), so they can't drift.
+       92 +- **Late-joiner sync:** the room row persists the latest playb
+          +ack state; a joiner computes
+       93 +  `position + elapsed`, and also requests a fresh state from t
+          +he host on join.
+       94 +- **Chat / queue / reactions / countdown:** broadcast events (
+          +chat & queue are also persisted to
+       95 +  Postgres; optimistic on the sender).
+       96 +- **Presence:** drives the live participant list and join/leav
+          +e.
+       97 +
+       98  ## Database Schema
+       99
+       49 -_TBD — `profiles`, `rooms`, `queue_items`, `messages`, `room_p
+          -articipants`._
+      100 +Schema **`eleven_auction`** (isolated from the project's `publ
+          +ic` schema). Tables:
+      101
+      102 +- `profiles` — `id → auth.users`, `display_name`, `avatar_colo
+          +r`
+      103 +- `rooms` — `code`, `name`, `host_id`, `is_public`, `status`,
+          +and the playback source-of-truth
+      104 +  columns `current_item_id`, `is_playing`, `position_seconds`,
+          + `playback_updated_at`
+      105 +- `queue_items` — `room_id`, `youtube_video_id`, `url`, `title
+          +`, `position`, `added_by`, `played`
+      106 +- `messages` — `room_id`, `user_id`, `display_name`, `content`
+          +, `type` (chat/system)
+      107 +- `room_participants` — `room_id`, `user_id`, `role` (host/vie
+          +wer), unique per (room, user)
+      108 +
+      109 +Row Level Security is enabled on all tables (helpers `is_room_
+          +member` / `is_room_host`); a trigger
+      110 +`handle_new_user` auto-creates a profile on signup. Full DDL i
+          +n
+      111 +[`supabase/migrations/0001_init.sql`](supabase/migrations/0001
+          +_init.sql) and
+      112 +[`0002_reset_rls.sql`](supabase/migrations/0002_reset_rls.sql)
+          +.
+      113 +
+      114  ## AI Usage
+      115
+       53 -This project was built with **Claude Code**. See `ai-transcrip
+          -ts/` for session exports and
+       54 -`ai-transcripts/ai-usage-summary.md` for a summary of what AI
+          -helped with and the manual
+       55 -decisions made.
+      116 +Built primarily with **Claude Code**. Session transcripts and
+          +a breakdown of what AI did vs. the
+      117 +manual decisions are in **[`ai-transcripts/`](ai-transcripts/)
+          +** (see
+      118 +[`ai-usage-summary.md`](ai-transcripts/ai-usage-summary.md)).
+      119
+      120  ## Running Locally
+      121
+      122 +**Prerequisites:** Node 20.9+ (Node 22 recommended), pnpm, and
+          + a Supabase project.
+      123 +
+      124  ```bash
+      125  pnpm install
+       61 -cp .env.example .env.local   # fill in Supabase keys
+       62 -pnpm dev
+      126 +cp .env.example .env.local     # fill in your Supabase keys (s
+          +ee below)
+      127  ```
+      128
+       65 -App runs at http://localhost:3000.
+      129 +**Supabase setup (one time):**
+      130 +1. **Apply the schema:** in the Supabase dashboard → **SQL Edi
+          +tor**, run
+      131 +   `supabase/migrations/0001_init.sql`, then `supabase/migrati
+          +ons/0002_reset_rls.sql`.
+      132 +2. **Expose the schema:** **Settings → API → Exposed schemas**
+          + → add `eleven_auction`.
+      133 +3. **Email auth:** **Authentication → Sign In / Providers → Em
+          +ail** → enable the provider and turn
+      134 +   **off** "Confirm email" (so signups work instantly for the
+          +demo).
+      135 +4. **Seed demo data:** `pnpm seed` (creates the demo accounts
+          ++ the `DEMO01` room).
+      136
+      137 +**Run it:**
+      138 +```bash
+      139 +pnpm dev      # http://localhost:3000
+      140 +```
+      141 +
+      142 +Useful scripts: `pnpm build`, `pnpm start`, `pnpm lint`, `pnpm
+          + seed`.
+      143 +
+      144  ## Environment Variables
+      145
+       69 -See `.env.example`. Required: `NEXT_PUBLIC_SUPABASE_URL`, `NEX
+          -T_PUBLIC_SUPABASE_ANON_KEY`,
+       70 -`SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SITE_URL`.
+      146 +See [`.env.example`](.env.example). All are required:
+      147
+      148 +| Variable | Purpose |
+      149 +|----------|---------|
+      150 +| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (browser-s
+          +afe) |
+      151 +| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (browser
+          +-safe; RLS protects data) |
+      152 +| `SUPABASE_SERVICE_ROLE_KEY` | **Server-only** — privileged w
+          +rites (room joins) + seeding |
+      153 +| `NEXT_PUBLIC_SITE_URL` | Base URL for building invite links
+          +|
+      154 +
+      155  ## Known Limitations
+      156
+       74 -_TBD._
+      157 +- **YouTube only** (no raw MP4 / other providers yet); videos
+          +must be embeddable.
+      158 +- **Desktop-first** — the room layout targets desktop (per the
+          + assignment, responsiveness isn't
+      159 +  graded). The chat/queue sidebar is hidden on narrow screens.
+      160 +- **No host hand-off** — if the host leaves, playback freezes
+          +at the last state; viewers can still
+      161 +  chat/react. A new host isn't auto-promoted.
+      162 +- **Clock skew** — drift math uses client clocks; large skew c
+          +ould shift sync by a second or two.
+      163 +- Room channels are public-by-obscurity (keyed by room UUID);
+          +fine for this scope, not hardened
+      164 +  for hostile multi-tenant use.
+      165
+      166  ## Future Improvements
+      167
+       78 -_TBD._
+      168 +- Host transfer / co-host roles; kick & moderation.
+      169 +- Support raw video URLs and other providers.
+      170 +- Polls, voice notes, "start at the same time" scheduling.
+      171 +- Server-timestamp-based sync to eliminate clock skew.
+      172 +- Mobile-optimized viewing mode.
+      173
+      174  ## Assumptions
+      175
+       82 -- YouTube is the primary video source (IFrame API enables prec
+          -ise sync).
+       83 -- Desktop-first (per the assignment, responsiveness is not gra
+          -ded).
+       84 -- Host-authoritative playback sync.
+      176 +- YouTube is the primary source (the IFrame API gives precise
+          +sync control).
+      177 +- Desktop-first is acceptable (stated in the brief).
+      178 +- Host-authoritative playback is the right model for "don't pe
+          +rmanently desync."
+      179 +- Free-tier Supabase/Vercel; built for small, friendly rooms,
+          +not large-scale load.
+
+⏺ Now the technical documentation:
+
+⏺ Write(docs/PROJECT_DOCUMENTATION.md)
+  ⎿  Wrote 122 lines to docs/PROJECT_DOCUMENTATION.md
+       2 # Project Documentation — Watch Together Platform
+       3 Technical reference for the codebase: structure, data model, rea
+         ltime engine, auth, and the key
+       4 engineering decisions.
+       5
+       6 ---
+       7
+       8 ## 1. Module map
+       9
+      10 ```
+     … +177 lines (ctrl+o to expand)
+
+⏺ Now the plain-language overview doc:
+
+⏺ Write(docs/OVERVIEW.md)
+  ⎿  Wrote 62 lines to docs/OVERVIEW.md
+       2 # Overview — The Challenge & How This Solution Solves It
+       3 A plain-language guide: what the assignment asked for, and how t
+         his app delivers it.
+       5 ---
+       6
+       7 ## The challenge, in one line
+       9 Build a **watch-party platform**: one person makes a room, adds
+         a YouTube link, invites friends,
+      10 and everyone watches **in sync** — if someone pauses or seeks, i
+         t updates for everyone — with live
+     … +80 lines (ctrl+o to expand)
+
+⏺ Now the AI-usage summary in ai-transcripts/:
+
+⏺ Write(ai-transcripts/ai-usage-summary.md)
+  ⎿  Wrote 73 lines to ai-transcripts/ai-usage-summary.md
+       2 # AI Usage Summary
+       3 ## Tools used
+       4
+       5 - **Claude Code** (Anthropic) — primary tool for architecture, i
+         mplementation, debugging, and docs.
+       7 ## Transcripts in this folder
+       8
+       9 The Claude Code sessions were exported with `/export` as the pro
+         ject was built, checkpoint by
+      10 checkpoint:
+     … +88 lines (ctrl+o to expand)
+
+⏺ All docs written (no code changed, so no rebuild needed).
+
+  One housekeeping note: you've been exporting transcripts to the repo root
+  (2026-06-28-*.txt). For submission they should live in ai-transcripts/ and
+  ideally be named claude-session-N.txt (the summary references that naming).
+
+⏺ ✅ Checkpoint 10 complete — documentation. Stopping for your commit.
+
+  What was written
+
+  - README.md — full submission doc: live demo + demo credentials, tech stack,
+  features, architecture diagram, realtime design, DB schema, AI usage,
+  run-locally + Supabase setup steps, env vars, known limitations, future
+  improvements, assumptions.
+  - docs/PROJECT_DOCUMENTATION.md — technical deep-dive: module map,
+  request/data flow, the realtime engine table, auth, RLS, and the key
+  engineering decisions (custom-schema typing, service-role membership,
+  broadcast-vs-postgres_changes, single player instance).
+  - docs/OVERVIEW.md — plain-language: the challenge, the user flow, and a
+  requirement-by-requirement mapping of how the solution satisfies it.
+  - ai-transcripts/ai-usage-summary.md — tools, how the work was directed, what
+  AI did, manual decisions, and what was reviewed/changed.
+
+  📁 Action for you (transcripts)
+
+  Move your exported session files into the folder and rename them, e.g.:
+  mkdir -p ai-transcripts
+  git mv 2026-06-28-184005-project-start.txt
+  ai-transcripts/claude-session-1.txt
+  git mv 2026-06-28-195519-auth-dashboard-landing.txt
+  ai-transcripts/claude-session-4.txt
+  git mv 2026-06-28-212436-queue-realtime-sync.txt
+  ai-transcripts/claude-session-7.txt
+  # …and add the remaining /export files as claude-session-N.txt
+  (Keep exporting after each remaining checkpoint so the set is complete.)
+
+  👉 Your commit
+
+  git add -A
+  git commit -m "docs: README, technical docs, overview, and AI usage summary
+
+  - Full README (demo creds, setup, architecture, realtime, schema, limitations)
+  - docs/PROJECT_DOCUMENTATION.md technical reference
+  - docs/OVERVIEW.md plain-language challenge walkthrough
+  - ai-transcripts/ai-usage-summary.md
+  - Move exported Claude sessions into ai-transcripts/ (manual)"
+
+  📤 Reminder: /export → ai-transcripts/claude-session-10.txt
+
+  ---
+  Say "continue" for the final Checkpoint 11: Deploy — push to GitHub, deploy to
+  Vercel, set the env vars, point the demo at the live URL, and verify it works
+  in two browser sessions. This one needs your GitHub + Vercel accounts; I'll
+  walk you through each step.
+
+✻ Sautéed for 3m 27s
+
+※ recap: We're building the Watch Together Platform (Option 4) in reviewed checkpoints; 10 of 11 are done, with code committed after each. Next: commit the documentation, then start Checkpoint 11 to deploy to Vercel (needs your GitHub and Vercel accounts).

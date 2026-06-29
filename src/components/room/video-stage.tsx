@@ -1,5 +1,7 @@
 "use client";
 
+import { Film } from "lucide-react";
+
 import { usePlayback } from "@/components/room/playback-provider";
 import { YouTubePlayer } from "@/components/room/youtube-player";
 import { ReactionsFloaters } from "@/components/room/reactions-overlay";
@@ -16,7 +18,7 @@ export function VideoStage() {
 
         {!currentItem && (
           <div className="pointer-events-none absolute inset-0 z-[5] flex flex-col items-center justify-center gap-2 bg-black/80 text-center text-white/80">
-            <span className="text-4xl">🎬</span>
+            <Film className="size-10 text-white/70" />
             <p className="text-sm font-medium">No video playing</p>
             <p className="max-w-xs text-xs text-white/60">
               {canControl

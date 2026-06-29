@@ -1,6 +1,6 @@
 "use client";
 
-import { Crown } from "lucide-react";
+import { Crown, Users } from "lucide-react";
 
 import { useRoom } from "@/components/room/room-provider";
 import { UserAvatar } from "@/components/user-avatar";
@@ -12,7 +12,7 @@ export function ParticipantsPanel() {
   if (participants.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-1 text-center text-sm text-muted-foreground">
-        <span className="text-2xl">👀</span>
+        <Users className="size-8" />
         <p>No one here yet</p>
       </div>
     );

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MessageSquare, Play, Smile, ListVideo, Timer, Users } from "lucide-react";
+import { Clapperboard, MessageSquare, Play, Smile, ListVideo, Timer, Users } from "lucide-react";
 
 import { getCurrentProfile } from "@/lib/supabase/queries";
 import { buttonVariants } from "@/components/ui/button";
@@ -22,7 +22,7 @@ export default async function LandingPage() {
     <div className="flex flex-1 flex-col">
       <header className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
         <span className="flex items-center gap-2 font-semibold tracking-tight">
-          <span className="text-xl">🎬</span> Watch Together
+          <Clapperboard className="size-5 text-primary" /> Watch Together
         </span>
         <div className="flex items-center gap-2">
           <Link href="/login" className={buttonVariants({ variant: "ghost", size: "sm" })}>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Play, X } from "lucide-react";
+import { ListVideo, Plus, Play, X } from "lucide-react";
 
 import { useRoom } from "@/components/room/room-provider";
 import { usePlayback } from "@/components/room/playback-provider";
@@ -45,7 +45,7 @@ export function QueuePanel() {
       <div className="flex-1 overflow-y-auto p-2">
         {queue.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-1 text-center text-sm text-muted-foreground">
-            <span className="text-2xl">📺</span>
+            <ListVideo className="size-8" />
             <p>Queue is empty</p>
             <p className="text-xs">Paste a YouTube link above to add the first video.</p>
           </div>

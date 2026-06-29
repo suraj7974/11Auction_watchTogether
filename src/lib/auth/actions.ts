@@ -66,7 +66,7 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   if (!data.session) {
     return {
       notice:
-        "Account created! 🎉 Confirm your email from your inbox, then sign in. (Tip: the host can disable email confirmation for instant access.)",
+        "Account created. Confirm your email from your inbox, then sign in. (Tip: the host can disable email confirmation for instant access.)",
     };
   }
 

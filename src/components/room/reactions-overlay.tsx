@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { SmilePlus } from "lucide-react";
 
 import { useRoom } from "@/components/room/room-provider";
-
-export const REACTION_EMOJIS = ["❤️", "😂", "🔥", "👏", "😮", "🎉"];
+import { EMOJI_CATEGORIES, MAIN_REACTIONS } from "@/lib/emojis";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type Floater = { id: string; emoji: string; left: number };
 
@@ -44,12 +45,14 @@ export function ReactionsFloaters() {
   );
 }
 
-/** Emoji picker bar — lives in the chat panel. */
+/** Emoji picker bar — lives in the chat panel. Quick reactions + a "more" modal. */
 export function ReactionBar() {
   const { sendReaction } = useRoom();
+  const [open, setOpen] = useState(false);
+
   return (
     <div className="flex items-center justify-center gap-1 border-t px-3 py-2">
-      {REACTION_EMOJIS.map((e) => (
+      {MAIN_REACTIONS.map((e) => (
         <button
           key={e}
           type="button"
@@ -60,6 +63,46 @@ export function ReactionBar() {
           {e}
         </button>
       ))}
+
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="More reactions"
+        className="ml-1 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <SmilePlus className="size-5" />
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reactions</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto pr-1">
+            {EMOJI_CATEGORIES.map((cat) => (
+              <div key={cat.name} className="mb-3">
+                <p className="mb-1 text-xs font-medium text-muted-foreground">{cat.name}</p>
+                <div className="grid grid-cols-8 gap-1">
+                  {cat.emojis.map((e, i) => (
+                    <button
+                      key={`${e}-${i}`}
+                      type="button"
+                      onClick={() => {
+                        sendReaction(e);
+                        setOpen(false);
+                      }}
+                      aria-label={`React ${e}`}
+                      className="rounded-md p-1 text-xl leading-none transition-transform hover:scale-125 hover:bg-muted"
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
