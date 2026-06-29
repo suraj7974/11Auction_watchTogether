@@ -33,7 +33,7 @@ export function RoomHeader({ siteUrl }: { siteUrl: string }) {
   }
 
   return (
-    <header className="flex h-14 items-center justify-between gap-3 border-b px-4">
+    <header className="flex h-14 items-center justify-between gap-3 border-b border-border/50 bg-background/50 px-4 backdrop-blur-md">
       <div className="flex items-center gap-3">
         <Link
           href="/dashboard"

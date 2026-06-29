@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Clapperboard, MessageSquare, Play, Smile, ListVideo, Timer, Users } from "lucide-react";
 
 import { getCurrentProfile } from "@/lib/supabase/queries";
+import { AppBackground } from "@/components/app-background";
 import { buttonVariants } from "@/components/ui/button";
 
 const FEATURES = [
@@ -20,6 +21,7 @@ export default async function LandingPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <AppBackground />
       <header className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
         <span className="flex items-center gap-2 font-semibold tracking-tight">
           <Clapperboard className="size-5 text-primary" /> Watch Together

@@ -20,7 +20,7 @@ export function RoomView({
   return (
     <RoomProvider bundle={bundle} currentUser={currentUser}>
       <PlaybackProvider>
-        <div className="flex h-[100dvh] flex-col bg-background/75">
+        <div className="flex h-[100dvh] flex-col bg-background/65">
           <RoomHeader siteUrl={siteUrl} />
 
           <div className="flex min-h-0 flex-1">
@@ -31,7 +31,7 @@ export function RoomView({
               </div>
             </main>
 
-            <aside className="hidden w-[360px] shrink-0 border-l md:flex md:flex-col">
+            <aside className="hidden w-[360px] shrink-0 border-l border-border/50 bg-card/40 backdrop-blur-md md:flex md:flex-col">
               <RoomSidebar />
             </aside>
           </div>

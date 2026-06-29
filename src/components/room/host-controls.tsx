@@ -26,7 +26,7 @@ export function HostControls() {
   const hasPlayable = Boolean(currentItem ?? firstPlayable);
 
   return (
-    <div className="mt-4 flex items-center gap-2 rounded-xl border bg-card p-3">
+    <div className="mt-4 flex items-center gap-2 rounded-xl border border-border/60 bg-card/60 p-3 shadow-sm backdrop-blur-md">
       {currentItem ? (
         <Button size="sm" onClick={togglePlay} disabled={!playerReady}>
           {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}

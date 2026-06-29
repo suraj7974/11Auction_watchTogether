@@ -9,7 +9,7 @@ import {
 
 export default function SignupPage() {
   return (
-    <Card>
+    <Card className="border-border/60 bg-card/70 shadow-lg backdrop-blur-md">
       <CardHeader>
         <CardTitle>Create your account</CardTitle>
         <CardDescription>Start watching videos together in seconds.</CardDescription>

@@ -17,7 +17,7 @@ export default async function LoginPage({
   const { next } = await searchParams;
 
   return (
-    <Card>
+    <Card className="border-border/60 bg-card/70 shadow-lg backdrop-blur-md">
       <CardHeader>
         <CardTitle>Welcome back</CardTitle>
         <CardDescription>Sign in to host or join a watch party.</CardDescription>
@@ -25,10 +25,10 @@ export default async function LoginPage({
       <CardContent className="flex flex-col gap-4">
         <AuthForm mode="login" next={next} />
 
-        <div className="relative py-1 text-center">
-          <span className="bg-card px-2 text-xs uppercase tracking-wide text-muted-foreground">
-            or
-          </span>
+        <div className="flex items-center gap-3">
+          <span className="h-px flex-1 bg-border" />
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">or</span>
+          <span className="h-px flex-1 bg-border" />
         </div>
 
         <form action={signInDemo}>
